@@ -1,0 +1,47 @@
+---
+name: Reverse Dependency Test of R Packages
+author: Insights Engineering
+description: GitHub Action for reverse dependency check of R packages
+
+inputs:
+  github-token:
+    description: Token to clone dependencies from GitHub repositories.
+    required: false
+    default: ""
+  repository-path:
+    description: Directory where the checked package has been cloned.
+    required: false
+    default: "."
+  additional-env-vars:
+    description: |
+      Additional environment variables.
+      Example usage:
+        additional-env-vars: |
+          ABC=123
+          XYZ=456
+    required: false
+    default: ""
+
+branding:
+  icon: 'refresh-ccw'
+  color: 'blue'
+
+runs:
+  using: composite
+  steps:
+    - name: Run revdepcheck
+      run: |
+        if [ "${{ inputs.additional-env-vars }}" != "" ]
+        then {
+          echo -e "${{ inputs.additional-env-vars }}" > /tmp/dotenv.env
+          export $(tr '\n' ' ' < /tmp/dotenv.env)
+        }
+        fi
+        echo ".libPaths(\" \", include.site = FALSE)" > .Rprofile
+        export R_LIBS_SITE=" "
+        export R_LIBS_USER=" "
+        Rscript ${GITHUB_ACTION_PATH}/script.R '${{ inputs.repository-path }}'
+      shell: bash
+      env:
+        GITHUB_PAT: "${{ inputs.github-token }}"
+        _R_CHECK_TESTS_NLINES_: 0
