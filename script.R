@@ -1,10 +1,6 @@
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
 
-if (!file.exists(".revdeprefs.yaml")) {
-  cat("Missing `.revdeprefs.yaml` file. Returning.\n")
-  return(NULL)
-}
 
 # Install required packages
 cat("Install required packages\n")
@@ -21,18 +17,24 @@ pak::pkg_install(c(
 ), ask = FALSE)
 
 # Read config file
-refs <- yaml::read_yaml(".revdeprefs.yaml")
+cli::cli_h1("Reading `.revdeprefs.yaml` config file...")
+if (!file.exists(".revdeprefs.yaml")) {
+  cli::cli_inform("Missing `.revdeprefs.yaml` file.")
+  cli::cli_inform("This indicates all reverse dependencies from CRAN.")
+  refs <- character(0L)
+} else {
+  refs <- yaml::read_yaml(".revdeprefs.yaml")
+  if (length(refs) == 0) {
+    cli::cli_inform("Empty `.revdeprefs.yaml` file")
+    cli::cli_inform("This indicates all reverse dependencies from CRAN.")
+  }
 
-if (length(refs) == 0) {
-  cli::cli_inform("Empty `.revdeprefs.yaml` file. This indicates all reverse dependencies from CRAN.")
-  return(NULL)
+  if (!is.character(refs) && !is.null(refs)) {
+    cli::cli_abort("Unknown structure of `.revdeprefs.yaml` file. Returning.")
+    return(NULL)
+  }
 }
-if (!is.character(refs) && !is.null(refs)) {
-  cli::cli_abort("Unknown structure of `.revdeprefs.yaml` file. Returning.")
-  return(NULL)
-}
-
-cli::cli_inform("File `.revdeprefs.yaml` read.")
+cli::cli_inform("References used:")
 cli::cli_bullets(refs)
 
 # init
