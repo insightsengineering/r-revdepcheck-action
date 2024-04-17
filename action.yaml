@@ -12,6 +12,10 @@ inputs:
     description: Directory where the checked package has been cloned.
     required: false
     default: "."
+  number-of-workers:
+    description: Number of revdepcheck workers
+    required: false
+    default: "4"
   additional-env-vars:
     description: |
       Additional environment variables.
@@ -40,7 +44,7 @@ runs:
         echo ".libPaths(\" \", include.site = FALSE)" > .Rprofile
         export R_LIBS_SITE=" "
         export R_LIBS_USER=" "
-        Rscript ${GITHUB_ACTION_PATH}/script.R '${{ inputs.repository-path }}'
+        Rscript ${GITHUB_ACTION_PATH}/script.R '${{ inputs.repository-path }}' '${{ inputs.number-of-workers }}'
       shell: bash
       env:
         GITHUB_PAT: "${{ inputs.github-token }}"

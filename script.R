@@ -1,6 +1,7 @@
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
 
+number_of_workers <- as.integer(args[2])
 
 # Install required packages
 cat("Install required packages\n")
@@ -116,7 +117,7 @@ print(revdepcheck::revdep_todo())
 options("repos" = c(crancache:::get_crancache_repos(), "CRAN" = "https://cloud.r-project.org"))
 
 cli::cli_h1("Executing revdepcheck...")
-revdepcheck::revdep_check(num_workers = 4)
+revdepcheck::revdep_check(num_workers = number_of_workers)
 
 cli::cli_h1("Printing the output reports...")
 catnl <- function(x = "") cat(sprintf("%s\n", x))
