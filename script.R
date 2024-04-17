@@ -56,14 +56,18 @@ invisible(crancache::available_packages())
 
 cat("DEBUG: `crancache::get_cache_package_dirs()`\n")
 print(crancache::get_cache_package_dirs())
-cat("DEBUG: `crancache::get_cached_repos(\"both\")`\n")
-print(crancache::get_cached_repos("both"))
+cat("DEBUG: `crancache:::get_crancache_repos(\"source\")`\n")
+print(crancache:::get_crancache_repos("source"))
 
 cache_dir <- crancache::get_cache_package_dirs()[["other/source"]]
 options("repos" = c(
-  crancache:::get_cached_repos("both"),
+  crancache:::get_crancache_repos("source"),
   getOption("repos")
 ))
+cat("DEBUG: repos\n")
+print(getOption("repos"))
+
+
 
 # include refs in revdepcheck
 cli::cli_h1("Adding refs to revdepcheck...")
