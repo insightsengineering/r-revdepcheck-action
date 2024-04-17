@@ -55,6 +55,10 @@ crancache::crancache_clean()
 invisible(crancache::available_packages(repos = c("CRAN" = "https://cloud.r-project.org")))
 
 crancache_dir <- crancache::get_cache_package_dirs()[["other/source"]]
+options("repos" = c(
+  "other" = paste0("file:///", normalizePath(file.path(crancache_dir, "..", ".."))),
+  "CRAN" = "https://cloud.r-project.org"
+))
 
 # include refs in revdepcheck
 cli::cli_h1("Adding refs to revdepcheck...")
@@ -92,7 +96,12 @@ for (ref in refs) {
         dir.create(untarred_dir)
         untar(x$fulltarget_tree, exdir = untarred_dir)
         sources_dir <- list.dirs(untarred_dir, recursive = FALSE)[1]
-        pkgbuild::build(sources_dir, dest_path = targz_path, binary = FALSE, vignettes = FALSE)
+        pkgbuild::build(
+          sources_dir,
+          dest_path = targz_path,
+          binary = FALSE,
+          vignettes = FALSE
+        )
         unlink(untarred_dir, recursive = TRUE)
       }
     }
@@ -109,15 +118,15 @@ for (ref in refs) {
   revdepcheck::revdep_add(packages = pkg)
   cli::cli_inform("Added to revdep todo!")
 }
+cli::cli_inform("All references added!")
 
-cli::cli_inform("revdep todo")
+cli::cli_inform("The current revdep todo (empty indicates the default - all revdeps):")
 print(revdepcheck::revdep_todo())
 
-# add cache to repos
-options("repos" = c(crancache:::get_crancache_repos(), "CRAN" = "https://cloud.r-project.org"))
 
 cli::cli_h1("Executing revdepcheck...")
 revdepcheck::revdep_check(num_workers = number_of_workers)
+
 
 cli::cli_h1("Printing the output reports...")
 catnl <- function(x = "") cat(sprintf("%s\n", x))
@@ -133,5 +142,6 @@ catnl(readLines("revdep/failures.md", warn = FALSE))
 
 cli::cli_h2("revdep/cran.md")
 catnl(readLines("revdep/cran.md", warn = FALSE))
+
 
 stopifnot(identical(readLines("revdep/problems.md", warn = FALSE), "*Wow, no problems at all. :)*"))
