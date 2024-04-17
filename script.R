@@ -52,12 +52,17 @@ revdepcheck:::db_setup(".")
 ## clean & refresh cache
 cli::cli_h2("crancache...")
 crancache::crancache_clean()
-invisible(crancache::available_packages(repos = c("CRAN" = "https://cloud.r-project.org")))
+invisible(crancache::available_packages())
 
-crancache_dir <- crancache::get_cache_package_dirs()[["other/source"]]
+cat("DEBUG: `crancache::get_cache_package_dirs()`\n")
+print(crancache::get_cache_package_dirs())
+cat("DEBUG: `crancache::get_cached_repos(\"both\")`\n")
+print(crancache::get_cached_repos("both"))
+
+cache_dir <- crancache::get_cache_package_dirs()[["other/source"]]
 options("repos" = c(
-  "other" = paste0("file:///", normalizePath(file.path(crancache_dir, "..", ".."))),
-  "CRAN" = "https://cloud.r-project.org"
+  crancache:::get_cached_repos("both"),
+  getOption("repos")
 ))
 
 # include refs in revdepcheck
@@ -107,11 +112,11 @@ for (ref in refs) {
     }
 
     # copy .tar.gz file into pkgcache dir
-    target_path <- file.path(crancache_dir, basename(x$fulltarget))
+    target_path <- file.path(cache_dir, basename(x$fulltarget))
     file.copy(targz_path, target_path)
     unlink(targz_path)
 
-    cranlike::update_PACKAGES(crancache_dir)
+    cranlike::update_PACKAGES(cache_dir)
     cli::cli_inform("Added to crancache!")
   }
 
@@ -123,6 +128,16 @@ cli::cli_inform("All references added!")
 cli::cli_inform("The current revdep todo (empty indicates the default - all revdeps):")
 print(revdepcheck::revdep_todo())
 
+
+cat("DEBUG: list dirs of cache_dir\n")
+print(list.dirs(crancache::get_cache_dir()))
+cat("DEBUG: available packages\n")
+for (repo in getOption("repos")) {
+  cat(repo)
+  cat("\n")
+  print(row.names(available.packages(repos = repo)))
+  cat("---\n")
+}
 
 cli::cli_h1("Executing revdepcheck...")
 revdepcheck::revdep_check(num_workers = number_of_workers)
