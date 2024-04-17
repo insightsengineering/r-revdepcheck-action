@@ -10,7 +10,7 @@ Executes `revdepcheck::revdep_check()` to check against potential breaking chang
 ```
 If the configuration file is missing (or it's empty) then all reverse dependencies are used.
 
-Please see [`revdepcheck`](https://github.com/r-lib/revdepcheck) package documentation for details.
+Please see [`revdepcheck`](https://revdepcheck.r-lib.org/) package documentation for details.
 
 ### Action Type
 Composite
