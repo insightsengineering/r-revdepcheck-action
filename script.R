@@ -1,20 +1,22 @@
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
 
-number_of_workers <- as.integer(args[2])
+number_of_workers <- 1L #as.integer(args[2])
 
 # Install required packages
 cat("Install required packages\n")
-install.packages("pak")
-pak::pkg_install(c(
-  "r-lib/revdepcheck",
-  "r-lib/crancache",
+install.packages(c(
+  "pak",
   "cranlike",
   "pkgdepends",
   "yaml",
   "cli",
   "usethis",
   "pkgbuild"
+))
+pak::pkg_install(c(
+  "r-lib/revdepcheck",
+  "r-lib/crancache"
 ), ask = FALSE)
 
 # Read config file
