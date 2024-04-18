@@ -1,7 +1,20 @@
+catnl <- function(x = "") cat(sprintf("%s\n", x))
+if_error <- function(x, y = NULL) {
+  res <- try(x, silent = TRUE)
+  if (is(res, "try-error")) {
+    return(y)
+  } else {
+    return(res)
+  }
+}
+`%||%` <- function(x, y) {
+  if (!length(x) || is.null(x)) y else x
+}
+
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
 
-number_of_workers <- 2L #as.integer(args[2])
+number_of_workers <- 3L #as.integer(args[2])
 
 # Install required packages
 cat("Install required packages\n")
@@ -154,11 +167,10 @@ print(revdepcheck::revdep_summary())
 
 for (revdep in revdepcheck::revdep_todo()$package) {
   cli::cli_h2(sprintf("Summary for: %s", revdep))
-  print(revdepcheck::revdep_details(revdep = revdep))
+  print(if_error(revdepcheck::revdep_details(revdep = revdep)))
 }
 
 cli::cli_h1("Printing the output reports...")
-catnl <- function(x = "") cat(sprintf("%s\n", x))
 
 cli::cli_h2("revdep/README.md")
 catnl(readLines("revdep/README.md", warn = FALSE))
@@ -180,7 +192,7 @@ print(
       rbind.data.frame,
       lapply(
         revdepcheck::revdep_summary(),
-        function(i) c(i$package, i$old[[1]]$duration, i$new$duration)
+        function(i) c(i$package, if_error(i$old[[1]]$duration) %||% "?", if_error(i$new$duration) %||% "?")
       )
     ),
     c("package", "old", "new")
