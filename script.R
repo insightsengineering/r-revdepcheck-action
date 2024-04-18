@@ -1,7 +1,7 @@
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
 
-number_of_workers <- 1L #as.integer(args[2])
+number_of_workers <- 2L #as.integer(args[2])
 
 # Install required packages
 cat("Install required packages\n")
@@ -138,7 +138,7 @@ print(revdepcheck::revdep_todo())
 cat("DEBUG: list dirs of cache_dir\n")
 print(list.dirs(crancache::get_cache_dir()))
 cat("DEBUG: available packages\n")
-for (repo in getOption("repos")) {
+for (repo in head(getOption("repos"), -1)) {
   cat(repo)
   cat("\n")
   print(row.names(available.packages(repos = repo)))
@@ -148,6 +148,14 @@ for (repo in getOption("repos")) {
 cli::cli_h1("Executing revdepcheck...")
 revdepcheck::revdep_check(num_workers = number_of_workers)
 
+
+cli::cli_h1("Summary...")
+print(revdepcheck::revdep_summary())
+
+for (revdep in revdepcheck::revdep_todo()$package) {
+  cli::cli_h2(sprintf("Summary for: %s", revdep))
+  print(revdepcheck::revdep_details(revdep = revdep))
+}
 
 cli::cli_h1("Printing the output reports...")
 catnl <- function(x = "") cat(sprintf("%s\n", x))
@@ -164,5 +172,19 @@ catnl(readLines("revdep/failures.md", warn = FALSE))
 cli::cli_h2("revdep/cran.md")
 catnl(readLines("revdep/cran.md", warn = FALSE))
 
+
+cli::cli_h1("Check duration...") # this does not include download and install
+print(
+  setNames(
+    do.call(
+      rbind.data.frame,
+      lapply(
+        revdepcheck::revdep_summary(),
+        function(i) c(i$package, i$old[[1]]$duration, i$new$duration)
+      )
+    ),
+    c("package", "old", "new")
+  )
+)
 
 stopifnot(identical(readLines("revdep/problems.md", warn = FALSE), "*Wow, no problems at all. :)*"))
