@@ -44,7 +44,7 @@ runs:
         echo ".libPaths(\" \", include.site = FALSE)" > .Rprofile
         export R_LIBS_SITE=" "
         export R_LIBS_USER=" "
-        Rscript ${GITHUB_ACTION_PATH}/script.R '${{ inputs.repository-path }}' '${{ inputs.number-of-workers }}'
+        time Rscript ${GITHUB_ACTION_PATH}/script.R '${{ inputs.repository-path }}' '${{ inputs.number-of-workers }}'
       shell: bash
       env:
         GITHUB_PAT: "${{ inputs.github-token }}"
