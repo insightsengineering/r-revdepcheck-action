@@ -17,7 +17,7 @@ setwd(normalizePath(file.path(args[1])))
 number_of_workers <- 2L #as.integer(args[2])
 
 # Install required packages
-cat("Install required packages\n")
+catnl("Install required packages")
 install.packages(c(
   "pak"
 ))
@@ -72,7 +72,7 @@ options("repos" = c(
   "minicran" = paste0("file:///", minicran_path),
   getOption("repos")
 ))
-cat("DEBUG: repos\n")
+catnl("DEBUG: repos")
 print(getOption("repos"))
 
 
@@ -131,16 +131,28 @@ cli::cli_inform("The current revdep todo (empty indicates the default - all revd
 print(revdepcheck::revdep_todo())
 
 
-cat("DEBUG: available packages\n")
+catnl("DEBUG: available packages\n")
 for (repo in head(getOption("repos"), -1)) {
-  cat(repo)
-  cat("\n")
+  catnl(repo)
   print(row.names(available.packages(repos = repo)))
-  cat("---\n")
+  catnl()
 }
 
 cli::cli_h1("Executing revdepcheck...")
 revdepcheck::revdep_check(num_workers = number_of_workers)
+
+
+catnl("DEBUG: crancache\n")
+crancache::get_cache_dir()
+catnl("file.info()")
+file.info(crancache::get_cache_dir())
+catnl("list.dirs()")
+list.dirs(crancache::get_cache_dir())
+catnl("list.files()")
+list.files(crancache::get_cache_dir(), recursive = TRUE)
+
+catnl("DEBUG: pkgcache\n")
+pkgcache::pkg_cache_summary()
 
 
 cli::cli_h1("Summary...")
