@@ -14,7 +14,7 @@ if_error <- function(x, y = NULL) {
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
 
-number_of_workers <- 3L #as.integer(args[2])
+number_of_workers <- 2L #as.integer(args[2])
 
 # Install required packages
 cat("Install required packages\n")
@@ -148,7 +148,7 @@ print(revdepcheck::revdep_summary())
 
 for (revdep in revdepcheck::revdep_todo()$package) {
   cli::cli_h2(sprintf("Summary for: %s", revdep))
-  print(if_error(revdepcheck::revdep_details(revdep = revdep)))
+  if_error(print(revdepcheck::revdep_details(revdep = revdep)))
 }
 
 cli::cli_h1("Printing the output reports...")
