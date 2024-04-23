@@ -67,14 +67,12 @@ revdepcheck:::db_setup(".")
 cli::cli_h2("miniCRAN...")
 minicran_path <- tempfile()
 dir.create(minicran_path)
+# added `rlang` as a dummy package as the `pkgs` arg cannot be empty
 miniCRAN::makeRepo(pkgs = "rlang", path = minicran_path, type = c("source", .Platform$pkgType))
 options("repos" = c(
   "minicran" = paste0("file:///", minicran_path),
   getOption("repos")
 ))
-catnl("DEBUG: repos")
-print(getOption("repos"))
-
 
 # include refs in revdepcheck
 cli::cli_h1("Adding refs to revdepcheck...")
@@ -131,30 +129,12 @@ cli::cli_inform("The current revdep todo (empty indicates the default - all revd
 print(revdepcheck::revdep_todo())
 
 
-catnl("DEBUG: available packages\n")
-for (repo in head(getOption("repos"), -1)) {
-  catnl(repo)
-  print(row.names(available.packages(repos = repo)))
-  catnl()
-}
-
+# Execute
 cli::cli_h1("Executing revdepcheck...")
 revdepcheck::revdep_check(num_workers = number_of_workers)
 
 
-catnl("DEBUG: crancache\n")
-crancache::get_cache_dir()
-catnl("file.info()")
-file.info(crancache::get_cache_dir())
-catnl("list.dirs()")
-list.dirs(crancache::get_cache_dir())
-catnl("list.files()")
-list.files(crancache::get_cache_dir(), recursive = TRUE)
-
-catnl("DEBUG: pkgcache\n")
-pkgcache::pkg_cache_summary()
-
-
+# Print results
 cli::cli_h1("Summary...")
 print(revdepcheck::revdep_summary())
 
@@ -177,8 +157,8 @@ catnl(readLines("revdep/failures.md", warn = FALSE))
 cli::cli_h2("revdep/cran.md")
 catnl(readLines("revdep/cran.md", warn = FALSE))
 
-
-cli::cli_h1("Check duration...") # this does not include download and install
+cli::cli_h1("Check duration...")
+# this does not include download and install times
 print(
   setNames(
     do.call(
