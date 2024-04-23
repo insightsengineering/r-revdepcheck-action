@@ -92,6 +92,9 @@ for (ref in refs) {
     dir.create(temp_download_dest_dir)
     x <- pak::pkg_download(ref, dest_dir = temp_download_dest_dir)
 
+    catnl("DEBUG: print download data")
+    print(as.list(x))
+
     if (file.exists(x$fulltarget)) {
       targz_path <- x$fulltarget
     } else if (file.exists(x$fulltarget_tree)) {
@@ -113,6 +116,8 @@ for (ref in refs) {
           vignettes = FALSE
         )
       }
+    } else {
+      stop("Cannot find path to the downloaded file.")
     }
 
     miniCRAN::addLocalPackage(pkg, dirname(targz_path), minicran_path)
