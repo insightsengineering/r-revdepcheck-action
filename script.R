@@ -88,7 +88,7 @@ for (ref in refs) {
   pkg <- ref_parsed$package
 
   if (!is(ref_parsed, "remote_ref_standard") && !is(ref_parsed, "remote_ref_cran")) {
-    x <- pak::pkg_install(ref, dependencies = FALSE)
+    x <- pak::pkg_install(ref)
     targz_path <- x$file[1]
     miniCRAN::addLocalPackage(pkg, dirname(targz_path), minicran_path)
 
