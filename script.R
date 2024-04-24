@@ -15,6 +15,7 @@ args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
 
 number_of_workers <- 2L #as.integer(args[2])
+timeout <- 20 * 60 #as.integer(args[3])
 
 # Install required packages
 catnl("Install required packages")
@@ -74,17 +75,14 @@ options("repos" = c(
   getOption("repos")
 ))
 
-## install pkg
-# cache pkg and its dependencies
-pak::pkg_install(".")
-
 # include refs in revdepcheck
 cli::cli_h1("Adding refs to revdepcheck...")
 ## for ref in refs:
+## - install dependencies to crancache (re-used further in revdepchecks)
 ## - download package sources
-## - build .tar.gz file
-## - move .tar.gz file to cache dir and refresh cashe
-## - add to revdep
+## - build a package (will create .tar.gz file)
+## - move .tar.gz file to miniCRAN repo (re-used further in revdepchecks)
+## - add to revdep todo table
 for (ref in refs) {
   cli::cli_inform(sprintf("Adding %s ...", ref))
 
@@ -92,8 +90,41 @@ for (ref in refs) {
   pkg <- ref_parsed$package
 
   if (!is(ref_parsed, "remote_ref_standard") && !is(ref_parsed, "remote_ref_cran")) {
-    x <- pak::pkg_install(ref)
-    targz_path <- x$file[1]
+    cli::cli_inform(sprintf("Installing dependencies %s ...", ref))
+    x <- pkgdepends::new_pkg_deps(ref, config = list(dependencies = FALSE))
+    x$resolve()
+    x$get_resolution()
+    x_deps <- x$get_resolution()[1, "deps"][[1]]
+    x_harddeps <- x_deps[tolower(x_deps$type) %in% tolower(pkgdepends::pkg_dep_types_hard()) & x_deps$ref != "R", "package"]
+    crancache::install_packages(x_harddeps)
+
+    cli::cli_inform(sprintf("Downloading %s ...", ref))
+    x <- pak::pkg_download(ref)
+    if (file.exists(x$fulltarget)) {
+      targz_path <- x$fulltarget
+    } else if (file.exists(x$fulltarget_tree)) {
+      cli::cli_inform(sprintf("Building %s ...", ref))
+      if (file.info(x$fulltarget_tree)$isdir) {
+        targz_path <- pkgbuild::build(
+          file.path(x$fulltarget_tree, "package"),
+          dest_path = targz_path,
+          binary = FALSE,
+          vignettes = FALSE
+        )
+      } else {
+        untarred_dir <- tempfile()
+        dir.create(untarred_dir)
+        untar(x$fulltarget_tree, exdir = untarred_dir)
+        sources_dir <- list.dirs(untarred_dir, recursive = FALSE)[1]
+        targz_path <- pkgbuild::build(
+          sources_dir,
+          binary = FALSE,
+          vignettes = FALSE
+        )
+      }
+    } else {
+      stop("Cannot find path to the downloaded file.")
+    }
     miniCRAN::addLocalPackage(pkg, dirname(targz_path), minicran_path)
 
     cli::cli_inform("Added to minicran!")
@@ -110,7 +141,7 @@ print(revdepcheck::revdep_todo())
 
 # Execute
 cli::cli_h1("Executing revdepcheck...")
-revdepcheck::revdep_check(num_workers = number_of_workers)
+revdepcheck::revdep_check(num_workers = number_of_workers, timeout = timeout)
 
 
 # Print results
