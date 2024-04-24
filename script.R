@@ -74,6 +74,10 @@ options("repos" = c(
   getOption("repos")
 ))
 
+## install pkg
+# cache pkg and its dependencies
+pak::pkg_install(".")
+
 # include refs in revdepcheck
 cli::cli_h1("Adding refs to revdepcheck...")
 ## for ref in refs:
