@@ -56,6 +56,14 @@ cli::cli_bullets(refs)
 # init
 cli::cli_h1("Initiating...")
 
+## install pkg
+# cache pkg and its dependencies
+cli::cli_h2("install...")
+x <- pkgdepends::new_pkg_deps(".", config = list(dependencies = FALSE))
+x$resolve()
+pkg_name <- x$get_resolution()$package
+crancache::install_packages(pkg_name)
+
 ## revdepcheck
 cli::cli_h2("revdepcheck...")
 revdepcheck::revdep_reset()
@@ -105,23 +113,24 @@ for (ref in refs) {
     } else if (file.exists(x$fulltarget_tree)) {
       cli::cli_inform(sprintf("Building %s ...", ref))
       if (file.info(x$fulltarget_tree)$isdir) {
-        targz_path <- pkgbuild::build(
-          file.path(x$fulltarget_tree, "package"),
-          dest_path = targz_path,
-          binary = FALSE,
-          vignettes = FALSE
-        )
+        sources_idr <- file.path(x$fulltarget_tree, "package")
       } else {
         untarred_dir <- tempfile()
         dir.create(untarred_dir)
+        catnl("DEBUG:")
+        file.exists(x$fulltarget_tree)
+        dir.exists(untarred_dir)
+        untar(x$fulltarget_tree)
+        untar(x$fulltarget_tree, list = TRUE)
         untar(x$fulltarget_tree, exdir = untarred_dir)
         sources_dir <- list.dirs(untarred_dir, recursive = FALSE)[1]
-        targz_path <- pkgbuild::build(
-          sources_dir,
-          binary = FALSE,
-          vignettes = FALSE
-        )
       }
+      targz_path <- pkgbuild::build(
+        sources_dir,
+        dest_path = targz_path,
+        binary = FALSE,
+        vignettes = FALSE
+      )
     } else {
       stop("Cannot find path to the downloaded file.")
     }
