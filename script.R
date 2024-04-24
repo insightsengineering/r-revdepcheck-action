@@ -88,38 +88,8 @@ for (ref in refs) {
   pkg <- ref_parsed$package
 
   if (!is(ref_parsed, "remote_ref_standard") && !is(ref_parsed, "remote_ref_cran")) {
-    temp_download_dest_dir <- tempfile()
-    dir.create(temp_download_dest_dir)
-    x <- pak::pkg_download(ref, dest_dir = temp_download_dest_dir)
-
-    catnl("DEBUG: print download data")
-    print(as.list(x))
-
-    if (file.exists(x$fulltarget)) {
-      targz_path <- x$fulltarget
-    } else if (file.exists(x$fulltarget_tree)) {
-      if (file.info(x$fulltarget_tree)$isdir) {
-        targz_path <- pkgbuild::build(
-          file.path(x$fulltarget_tree, "package"),
-          dest_path = targz_path,
-          binary = FALSE,
-          vignettes = FALSE
-        )
-      } else {
-        untarred_dir <- tempfile()
-        dir.create(untarred_dir)
-        untar(x$fulltarget_tree, exdir = untarred_dir)
-        sources_dir <- list.dirs(untarred_dir, recursive = FALSE)[1]
-        targz_path <- pkgbuild::build(
-          sources_dir,
-          binary = FALSE,
-          vignettes = FALSE
-        )
-      }
-    } else {
-      stop("Cannot find path to the downloaded file.")
-    }
-
+    x <- pak::pkg_install(ref, dependencies = FALSE)
+    targz_path <- x$file[1]
     miniCRAN::addLocalPackage(pkg, dirname(targz_path), minicran_path)
 
     cli::cli_inform("Added to minicran!")
