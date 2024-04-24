@@ -107,34 +107,44 @@ for (ref in refs) {
     crancache::install_packages(x_harddeps)
 
     cli::cli_inform(sprintf("Downloading %s ...", ref))
-    x <- pak::pkg_download(ref)
-    if (file.exists(x$fulltarget)) {
-      targz_path <- x$fulltarget
-    } else if (file.exists(x$fulltarget_tree)) {
-      cli::cli_inform(sprintf("Building %s ...", ref))
-      if (file.info(x$fulltarget_tree)$isdir) {
-        sources_idr <- file.path(x$fulltarget_tree, "package")
-      } else {
-        untarred_dir <- tempfile()
-        dir.create(untarred_dir)
-        catnl("DEBUG:")
-        file.exists(x$fulltarget_tree)
-        dir.exists(untarred_dir)
-        untar(x$fulltarget_tree)
-        untar(x$fulltarget_tree, list = TRUE)
-        untar(x$fulltarget_tree, exdir = untarred_dir)
-        sources_dir <- list.dirs(untarred_dir, recursive = FALSE)[1]
-      }
-      targz_path <- pkgbuild::build(
-        sources_dir,
-        dest_path = targz_path,
-        binary = FALSE,
-        vignettes = FALSE
-      )
-    } else {
-      stop("Cannot find path to the downloaded file.")
-    }
-    miniCRAN::addLocalPackage(pkg, dirname(targz_path), minicran_path)
+    #x <- pak::pkg_download(ref)
+    #if (file.exists(x$fulltarget)) {
+    #  targz_path <- x$fulltarget
+    #} else if (file.exists(x$fulltarget_tree)) {
+    #  cli::cli_inform(sprintf("Building %s ...", ref))
+    #  if (file.info(x$fulltarget_tree)$isdir) {
+    #    sources_idr <- file.path(x$fulltarget_tree, "package")
+    #  } else {
+    #    untarred_dir <- tempfile()
+    #    dir.create(untarred_dir)
+    #    catnl("DEBUG:")
+    #    print(file.exists(x$fulltarget_tree))
+    #    print(dir.exists(untarred_dir))
+    #    print(system("tar --version", intern = TRUE))
+    #    untar(x$fulltarget_tree)
+    #    untar(x$fulltarget_tree, list = TRUE)
+    #    untar(x$fulltarget_tree, exdir = untarred_dir)
+    #    sources_dir <- list.dirs(untarred_dir, recursive = FALSE)[1]
+    #  }
+    #  targz_path <- pkgbuild::build(
+    #    sources_dir,
+    #    dest_path = targz_path,
+    #    binary = FALSE,
+    #    vignettes = FALSE
+    #  )
+    #} else {
+    #  stop("Cannot find path to the downloaded file.")
+    #}
+
+    x <- pak::pkg_install(ref)
+    targz_path <- pkgcache::pkg_cache_find(package = pkg, built = 1, platform = "source", version = x$version[1])$fullpath[1]
+    temp_dir <- tempfile()
+    dir.create(temp_dir)
+    file.copy(
+      targz_path,
+      file.path(temp_dir, paste0(sub("(.*?_.*?)_.*", "\\1", basename(targz_path)), ".tar.gz"))
+    )
+    miniCRAN::addLocalPackage(pkg, temp_dir, minicran_path)
 
     cli::cli_inform("Added to minicran!")
   }
