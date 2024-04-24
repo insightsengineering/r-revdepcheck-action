@@ -137,7 +137,10 @@ for (ref in refs) {
     #}
 
     x <- pak::pkg_install(ref)
-    targz_path <- pkgcache::pkg_cache_find(package = pkg, built = 1, platform = "source", version = x$version[1])$fullpath[1]
+    x_cache <- pkgcache::pkg_cache_find(package = pkg)
+    print(x_cache)
+    targz_path <- subset(x_cache, built == 1 & platform == "source" & version == x$version[1], fullpath)[[1]]
+    print(targz_path)
     temp_dir <- tempfile()
     dir.create(temp_dir)
     file.copy(
