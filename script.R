@@ -106,14 +106,21 @@ for (ref in refs) {
     ref_deps <- pkgdepends::new_pkg_deps(ref, config = list(dependencies = FALSE))
     ref_deps$resolve()
     ref_deps_df <- ref_deps$get_resolution()[1, "deps"][[1]]
-    ref_deps_hard <- ref_deps_df[tolower(ref_deps_df$type) %in% tolower(pkgdepends::pkg_dep_types_hard()) & ref_deps_df$ref != "R", "package"]
+    ref_deps_hard <- ref_deps_df[
+      tolower(ref_deps_df$type) %in% tolower(pkgdepends::pkg_dep_types_hard()) & ref_deps_df$ref != "R",
+      "package"
+    ]
     crancache::install_packages(ref_deps_hard, quiet = TRUE)
 
     cli::cli_inform(sprintf("Installing %s ...", ref))
     ref_install <- pak::pkg_install(ref)
     ref_cache <- pkgcache::pkg_cache_find(package = ref_pkg)
     print(ref_cache)
-    ref_targz <- subset(ref_cache, (built == 1 | built == TRUE) & platform == "source" & version == ref_cache$version[1], fullpath)[[1]]
+    ref_targz <- subset(
+      ref_cache,
+      (built == 1 | built == TRUE | built == "TRUE") & platform == "source" & version == ref_install$version[1],
+      fullpath
+    )[[1]]
     print(ref_targz)
     # cache might have multiple files for a given package and version
     # copy this file to the temp dir and add to miniCRAN from that dir
