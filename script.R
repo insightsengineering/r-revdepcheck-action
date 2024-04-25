@@ -123,6 +123,7 @@ for (ref in refs) {
       ref_targz,
       file.path(temp_dir, paste0(sub("(.*?_.*?)_.*", "\\1", basename(ref_targz)), ".tar.gz"))
     )
+    print(list.files(temp_dir))
     miniCRAN::addLocalPackage(ref_pkg, temp_dir, minicran_path)
 
     cli::cli_inform("Added to minicran!")
