@@ -167,7 +167,6 @@ for (revdep in revdepcheck::revdep_todo()$package) {
   if_error(print(revdepcheck::revdep_details(revdep = revdep)))
 }
 
-cli::cli_progress_step("Printing the output reports...")
 
 cli::cli_h2("revdep/README.md")
 catnl(readLines("revdep/README.md", warn = FALSE))
