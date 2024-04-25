@@ -59,10 +59,8 @@ cli::cli_h1("Initiating...")
 ## install pkg
 # cache pkg and its dependencies
 cli::cli_h2("install...")
-x <- pkgdepends::new_pkg_deps(".", config = list(dependencies = FALSE))
-x$resolve()
-pkg_name <- x$get_resolution()$package
-crancache::install_packages(pkg_name)
+pkg_name <- read.dcf("DESCRIPTION")[1, "Package"][[1]]
+crancache::install_packages(pkg_name, quiet = TRUE)
 
 ## revdepcheck
 cli::cli_h2("revdepcheck...")
@@ -78,6 +76,8 @@ minicran_path <- tempfile()
 dir.create(minicran_path)
 # added `rlang` as a dummy package as the `pkgs` arg cannot be empty
 miniCRAN::makeRepo(pkgs = "rlang", path = minicran_path, type = c("source", .Platform$pkgType))
+# add minicran repo path to repos so that revdepcheck can use it
+# this is the directory where we will store packages from config file
 options("repos" = c(
   "minicran" = paste0("file:///", minicran_path),
   getOption("repos")
@@ -85,74 +85,48 @@ options("repos" = c(
 
 # include refs in revdepcheck
 cli::cli_h1("Adding refs to revdepcheck...")
+## Add revdep to miniCRAN repo so that it can be found by the revdepcheck.
+## miniCRAN accepts only prebuilt .tar.gz file and build requires all the dependencies pre-installed.
+## This is why we need to install all the deps of revdep (incl. tested package).
+## It's important to use `crancache` as much as possible to make use of caching.
+## Algorithm:
 ## for ref in refs:
-## - install dependencies to crancache (re-used further in revdepchecks)
-## - download package sources
-## - build a package (will create .tar.gz file)
-## - move .tar.gz file to miniCRAN repo (re-used further in revdepchecks)
+## - install dependencies using `crancache`
+## - install pkg using `pak` - this also gives prebuilt .tar.gz file
+## - move .tar.gz file to miniCRAN repo
 ## - add to revdep todo table
 for (ref in refs) {
   cli::cli_inform(sprintf("Adding %s ...", ref))
 
   ref_parsed <- pkgdepends::parse_pkg_ref(ref)
-  pkg <- ref_parsed$package
+  ref_pkg <- ref_parsed$package
 
   if (!is(ref_parsed, "remote_ref_standard") && !is(ref_parsed, "remote_ref_cran")) {
-    cli::cli_inform(sprintf("Installing dependencies %s ...", ref))
-    x <- pkgdepends::new_pkg_deps(ref, config = list(dependencies = FALSE))
-    x$resolve()
-    x$get_resolution()
-    x_deps <- x$get_resolution()[1, "deps"][[1]]
-    x_harddeps <- x_deps[tolower(x_deps$type) %in% tolower(pkgdepends::pkg_dep_types_hard()) & x_deps$ref != "R", "package"]
-    crancache::install_packages(x_harddeps)
+    cli::cli_inform(sprintf("Installing dependencies of %s ...", ref))
+    ref_deps <- pkgdepends::new_pkg_deps(ref, config = list(dependencies = FALSE))
+    ref_deps$resolve()
+    ref_deps_df <- ref_deps$get_resolution()[1, "deps"][[1]]
+    ref_deps_hard <- ref_deps_df[tolower(ref_deps_df$type) %in% tolower(pkgdepends::pkg_dep_types_hard()) & ref_deps_df$ref != "R", "package"]
+    crancache::install_packages(ref_deps_hard, quiet = TRUE)
 
-    cli::cli_inform(sprintf("Downloading %s ...", ref))
-    #x <- pak::pkg_download(ref)
-    #if (file.exists(x$fulltarget)) {
-    #  targz_path <- x$fulltarget
-    #} else if (file.exists(x$fulltarget_tree)) {
-    #  cli::cli_inform(sprintf("Building %s ...", ref))
-    #  if (file.info(x$fulltarget_tree)$isdir) {
-    #    sources_idr <- file.path(x$fulltarget_tree, "package")
-    #  } else {
-    #    untarred_dir <- tempfile()
-    #    dir.create(untarred_dir)
-    #    catnl("DEBUG:")
-    #    print(file.exists(x$fulltarget_tree))
-    #    print(dir.exists(untarred_dir))
-    #    print(system("tar --version", intern = TRUE))
-    #    untar(x$fulltarget_tree)
-    #    untar(x$fulltarget_tree, list = TRUE)
-    #    untar(x$fulltarget_tree, exdir = untarred_dir)
-    #    sources_dir <- list.dirs(untarred_dir, recursive = FALSE)[1]
-    #  }
-    #  targz_path <- pkgbuild::build(
-    #    sources_dir,
-    #    dest_path = targz_path,
-    #    binary = FALSE,
-    #    vignettes = FALSE
-    #  )
-    #} else {
-    #  stop("Cannot find path to the downloaded file.")
-    #}
-
-    x <- pak::pkg_install(ref)
-    x_cache <- pkgcache::pkg_cache_find(package = pkg)
-    print(x_cache)
-    targz_path <- subset(x_cache, (built == 1 | built == TRUE) & platform == "source" & version == x$version[1], fullpath)[[1]]
-    print(targz_path)
+    cli::cli_inform(sprintf("Installing %s ...", ref))
+    ref_install <- pak::pkg_install(ref)
+    ref_cache <- pkgcache::pkg_cache_find(package = ref_pkg)
+    ref_targz <- subset(ref_cache, (built == 1 | built == TRUE) & platform == "source" & version == ref_cache$version[1], fullpath)[[1]]
+    # cache might have multiple files for a given package and version
+    # copy this file to the temp dir and add to miniCRAN from that dir
     temp_dir <- tempfile()
     dir.create(temp_dir)
     file.copy(
-      targz_path,
-      file.path(temp_dir, paste0(sub("(.*?_.*?)_.*", "\\1", basename(targz_path)), ".tar.gz"))
+      ref_targz,
+      file.path(temp_dir, paste0(sub("(.*?_.*?)_.*", "\\1", basename(ref_targz)), ".tar.gz"))
     )
-    miniCRAN::addLocalPackage(pkg, temp_dir, minicran_path)
+    miniCRAN::addLocalPackage(ref_pkg, temp_dir, minicran_path)
 
     cli::cli_inform("Added to minicran!")
   }
 
-  revdepcheck::revdep_add(packages = pkg)
+  revdepcheck::revdep_add(packages = ref_pkg)
   cli::cli_inform("Added to revdep todo!")
 }
 cli::cli_inform("All references added!")
