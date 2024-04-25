@@ -1,4 +1,3 @@
-<!-- BEGIN_ACTION_DOC -->
 # Reverse Dependency Test of R Packages
 
 ### Description
@@ -14,6 +13,8 @@ This action is using `.revdeprefs.yaml` configuration file to control which reve
 If the configuration file is missing (or it's empty) then all reverse dependencies are used.
 
 Please see [`revdepcheck`](https://revdepcheck.r-lib.org/) package documentation for details.
+
+<!-- BEGIN_ACTION_DOC -->
 
 ### Action Type
 Composite
@@ -37,6 +38,22 @@ Insights Engineering
   _Required_: `false`
 
   _Default_: `.`
+
+* `number-of-workers`:
+
+  _Description_: Number of revdepcheck workers
+
+  _Required_: `false`
+
+  _Default_: `2`
+
+* `timeout`:
+
+  _Description_: Max timeout (in seconds) of revdepcheck process.
+
+  _Required_: `false`
+
+  _Default_: `1200`
 
 * `additional-env-vars`:
 
