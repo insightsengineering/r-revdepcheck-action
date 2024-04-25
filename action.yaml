@@ -15,7 +15,11 @@ inputs:
   number-of-workers:
     description: Number of revdepcheck workers
     required: false
-    default: "4"
+    default: "2"
+  timeout:
+    description: Max timeout (in seconds) of revdepcheck process.
+    required: false
+    default: "1200"
   additional-env-vars:
     description: |
       Additional environment variables.
@@ -44,7 +48,7 @@ runs:
         echo ".libPaths(\" \", include.site = FALSE)" > .Rprofile
         export R_LIBS_SITE=" "
         export R_LIBS_USER=" "
-        time Rscript ${GITHUB_ACTION_PATH}/script.R '${{ inputs.repository-path }}' '${{ inputs.number-of-workers }}'
+        time Rscript ${GITHUB_ACTION_PATH}/script.R '${{ inputs.repository-path }}' '${{ inputs.number-of-workers }}' '${{ inputs.timeout }}'
       shell: bash
       env:
         GITHUB_PAT: "${{ inputs.github-token }}"

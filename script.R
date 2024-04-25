@@ -13,12 +13,11 @@ if_error <- function(x, y = NULL) {
 
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
-
-number_of_workers <- 2L #as.integer(args[2])
-timeout <- 20 * 60 #as.integer(args[3])
+number_of_workers <- as.integer(args[2])
+timeout <- as.integer(args[3])
 
 # Install required packages
-catnl("Install required packages")
+catnl("Installing required packages...")
 install.packages(c(
   "pak"
 ))
@@ -32,8 +31,11 @@ pak::pkg_install(c(
   "yaml"
 ), ask = FALSE)
 
+
 # Read config file
-cli::cli_h1("Reading `.revdeprefs.yaml` config file...")
+cli::cli_h1("Configuration")
+cli::cli_progress_bar()
+cli::cli_progress_step("Reading `.revdeprefs.yaml` config file...")
 if (!file.exists(".revdeprefs.yaml")) {
   cli::cli_inform("Missing `.revdeprefs.yaml` file.")
   cli::cli_inform("This indicates all reverse dependencies from CRAN.")
@@ -50,20 +52,23 @@ if (!file.exists(".revdeprefs.yaml")) {
     return(NULL)
   }
 }
+cli::cli_progress_done()
 cli::cli_inform("References used:")
 cli::cli_bullets(refs)
 
+
 # init
-cli::cli_h1("Initiating...")
+cli::cli_h1("Initiate pre-requisites")
+cli::cli_progress_bar()
 
 ## install pkg
 # cache pkg and its dependencies
-cli::cli_h2("install...")
+cli::cli_progress_step("Installing the package...")
 pkg_name <- read.dcf("DESCRIPTION")[1, "Package"][[1]]
 crancache::install_packages(pkg_name, quiet = TRUE)
 
 ## revdepcheck
-cli::cli_h2("revdepcheck...")
+cli::cli_progress_step("Initiating `revdepcheck`...")
 revdepcheck::revdep_reset()
 unlink("./revdep/", recursive = TRUE)
 revdepcheck:::db_disconnect(".")
@@ -71,7 +76,7 @@ usethis::use_revdep()
 revdepcheck:::db_setup(".")
 
 ## miniCRAN
-cli::cli_h2("miniCRAN...")
+cli::cli_progress_step("Initiating `miniCRAN`...")
 minicran_path <- tempfile()
 dir.create(minicran_path)
 # added `rlang` as a dummy package as the `pkgs` arg cannot be empty
@@ -83,8 +88,11 @@ options("repos" = c(
   getOption("repos")
 ))
 
+cli::cli_progress_done()
+
+
+cli::cli_h1("Add refs to revdepcheck")
 # include refs in revdepcheck
-cli::cli_h1("Adding refs to revdepcheck...")
 ## Add revdep to miniCRAN repo so that it can be found by the revdepcheck.
 ## miniCRAN accepts only prebuilt .tar.gz file and build requires all the dependencies pre-installed.
 ## This is why we need to install all the deps of revdep (incl. tested package).
@@ -95,14 +103,15 @@ cli::cli_h1("Adding refs to revdepcheck...")
 ## - install pkg using `pak` - this also gives prebuilt .tar.gz file
 ## - move .tar.gz file to miniCRAN repo
 ## - add to revdep todo table
+cli::cli_progress_bar("Adding refs to revdepcheck", total = length(refs))
 for (ref in refs) {
-  cli::cli_inform(sprintf("Adding %s ...", ref))
+  cli::cli_progress_message("Adding {ref}...")
 
   ref_parsed <- pkgdepends::parse_pkg_ref(ref)
   ref_pkg <- ref_parsed$package
 
   if (!is(ref_parsed, "remote_ref_standard") && !is(ref_parsed, "remote_ref_cran")) {
-    cli::cli_inform(sprintf("Installing dependencies of %s ...", ref))
+    cli::cli_progress_message("Installing dependencies of {ref}...")
     ref_deps <- pkgdepends::new_pkg_deps(ref, config = list(dependencies = FALSE))
     ref_deps$resolve()
     ref_deps_df <- ref_deps$get_resolution()[1, "deps"][[1]]
@@ -112,16 +121,14 @@ for (ref in refs) {
     ]
     crancache::install_packages(ref_deps_hard, quiet = TRUE)
 
-    cli::cli_inform(sprintf("Installing %s ...", ref))
+    cli::cli_progress_message("Installing {ref}...")
     ref_install <- pak::pkg_install(ref)
     ref_cache <- pkgcache::pkg_cache_find(package = ref_pkg)
-    print(ref_cache)
     ref_targz <- subset(
       ref_cache,
       (built == 1 | built == TRUE | built == "TRUE") & platform == "source" & version == ref_install$version[1],
       fullpath
     )[[1]]
-    print(ref_targz)
     # cache might have multiple files for a given package and version
     # copy this file to the temp dir and add to miniCRAN from that dir
     temp_dir <- tempfile()
@@ -130,15 +137,16 @@ for (ref in refs) {
       ref_targz,
       file.path(temp_dir, paste0(sub("(.*?_.*?)_.*", "\\1", basename(ref_targz)), ".tar.gz"))
     )
-    print(list.files(temp_dir))
     miniCRAN::addLocalPackage(ref_pkg, temp_dir, minicran_path)
 
-    cli::cli_inform("Added to minicran!")
+    cli::cli_inform("Added {ref} to minicran!")
   }
 
   revdepcheck::revdep_add(packages = ref_pkg)
-  cli::cli_inform("Added to revdep todo!")
+  cli::cli_inform("Added {ref} to revdep todo!")
+  cli::cli_progress_update()
 }
+cli::cli_progress_done()
 cli::cli_inform("All references added!")
 
 cli::cli_inform("The current revdep todo (empty indicates the default - all revdeps):")
@@ -146,12 +154,12 @@ print(revdepcheck::revdep_todo())
 
 
 # Execute
-cli::cli_h1("Executing revdepcheck...")
+cli::cli_h1("Execute revdepcheck")
 revdepcheck::revdep_check(num_workers = number_of_workers, timeout = timeout)
 
 
 # Print results
-cli::cli_h1("Summary...")
+cli::cli_h1("Summary")
 print(revdepcheck::revdep_summary())
 
 for (revdep in revdepcheck::revdep_todo()$package) {
@@ -159,7 +167,7 @@ for (revdep in revdepcheck::revdep_todo()$package) {
   if_error(print(revdepcheck::revdep_details(revdep = revdep)))
 }
 
-cli::cli_h1("Printing the output reports...")
+cli::cli_progress_step("Printing the output reports...")
 
 cli::cli_h2("revdep/README.md")
 catnl(readLines("revdep/README.md", warn = FALSE))
@@ -173,7 +181,7 @@ catnl(readLines("revdep/failures.md", warn = FALSE))
 cli::cli_h2("revdep/cran.md")
 catnl(readLines("revdep/cran.md", warn = FALSE))
 
-cli::cli_h1("Check duration...")
+cli::cli_h2("Check duration...")
 # this does not include download and install times
 print(
   setNames(
