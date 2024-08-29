@@ -65,7 +65,17 @@ cli::cli_progress_bar()
 # cache pkg and its dependencies
 cli::cli_progress_step("Installing the package...")
 pkg_name <- read.dcf("DESCRIPTION")[1, "Package"][[1]]
-crancache::install_packages(pkg_name, quiet = TRUE)
+tryCatch(
+  crancache::install_packages(pkg_name, quiet = TRUE),
+  warning = function(w) {
+    if (grepl('package.*is not available for this version of R', w$message)) {
+      q()
+    } else {
+      stop(w$message)
+    }
+  }
+)
+
 
 ## revdepcheck
 cli::cli_progress_step("Initiating `revdepcheck`...")
