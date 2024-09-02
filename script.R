@@ -119,15 +119,16 @@ pkg_name <- read.dcf("DESCRIPTION")[, "Package"]
 pkg_ref_released <- if (pkg_name %in% rownames(available.packages())) {
   pkg_name
 } else {
-  # @TODO: think of a better way to get ref for released version of non-CRAN packages
-  read.dcf("DESCRIPTION")[1, "URL"] |>
-    gsub("\n", "", x = _) |>
-    gsub("/$", "", x = _) |>
-    strsplit(x = _, split = ",") |>
-    _[[1]] |>
-    grep(x = _, "github.com", value = TRUE) |>
-    gsub(".*github.com/", "\\1", x = _) |>
-    paste0("@*release")
+  pkg_url <- read.dcf("DESCRIPTION")[1, "URL"]
+  pkg_url_v <- strsplit(pkg_url, ",")[[1]]
+  pkg_url_v <- gsub("\n|/$", "", pkg_url_v)
+  pkg_url_gh <- grep("github.com", pkg_url_v, value = TRUE)
+  res <- paste0(gsub(".*github.com/", "", pkg_url_gh), "@*release")
+  if (length(res) == 0) {
+    cli::cli_abort("Unable to automatically determine the package reference.")
+    return(NULL)
+  }
+  res
 }
 install_and_add_to_minicran(pkg_ref_released, minicran_path)
 cli::cli_progress_step("Installing the package (DEV)...")
