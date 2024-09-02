@@ -15,7 +15,7 @@ check_if_pkg_available <- function(pkg, ver) {
     available.packages(
       filter = list(
         add = TRUE,
-        function (db) {
+        function(db) {
           db[db[, "Package"] == pkg & db[, "Version"] == ver, ]
         }
       )
@@ -23,7 +23,6 @@ check_if_pkg_available <- function(pkg, ver) {
   ) > 0
 }
 install_and_add_to_minicran <- function(pkg, minicran_path) {
-  avail_pkgs <- rownames(available.packages())
   x <- pak::pkg_install(pkg)
   for (i in seq_len(nrow(x))) {
     i_package <- x$package[i]
