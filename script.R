@@ -68,7 +68,7 @@ pkg_name <- read.dcf("DESCRIPTION")[1, "Package"][[1]]
 tryCatch(
   crancache::install_packages(pkg_name, quiet = TRUE),
   warning = function(w) {
-    if (grepl('package.*is not available for this version of R', w$message)) {
+    if (grepl("package.*is not available for this version of R", w$message)) {
       q()
     } else {
       stop(w$message)
