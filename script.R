@@ -10,19 +10,24 @@ if_error <- function(x, y = NULL) {
 `%||%` <- function(x, y) {
   if (!length(x) || is.null(x)) y else x
 }
-check_if_pkg_available <- function(pkg, ver) {
-  length(
-    available.packages(
-      filter = list(
-        add = TRUE,
-        function(db) {
-          db[db[, "Package"] == pkg & db[, "Version"] == ver, ]
-        }
+check_if_pkg_available <- function(pkg, ver = NULL) {
+  if (is.null(ver)) {
+    length(available.packages(filter = list(add = TRUE, function(db) db[db[, "Package"] == pkg, ]))) > 0
+  } else {
+    length(
+      available.packages(
+        filter = list(
+          add = TRUE,
+          function(db) {
+            db[db[, "Package"] == pkg & db[, "Version"] == ver, ]
+          }
+        )
       )
-    )
-  ) > 0
+    ) > 0
+  }
 }
 install_and_add_to_minicran <- function(pkg, minicran_path) {
+  cli::cli_inform(sprintf("Installing and adding %s to miniCRAN...", pkg))
   x <- pak::pkg_install(pkg)
   for (i in seq_len(nrow(x))) {
     i_package <- x$package[i]
@@ -105,6 +110,7 @@ revdepcheck:::db_setup(".")
 cli::cli_progress_step("Initiating `miniCRAN`...")
 minicran_path <- tempfile()
 dir.create(minicran_path)
+on.exit(unlink(minicran_path, recursive = TRUE))
 miniCRAN::makeRepo(pkgs = "rlang", path = minicran_path, type = c("source", .Platform$pkgType))
 # add minicran repo path to repos so that revdepcheck can use it
 # this is the directory where we will store packages from config file
@@ -114,15 +120,16 @@ options("repos" = c(
 ))
 
 ## install pkg
+cli::cli_progress_step("Installing the package (DEV)...")
+install_and_add_to_minicran(".", minicran_path)
 cli::cli_progress_step("Installing the package (CRAN)...")
 pkg_name <- read.dcf("DESCRIPTION")[, "Package"]
-pkg_ref_released <- if (pkg_name %in% rownames(available.packages())) {
+pkg_ref_released <- if (check_if_pkg_available(pkg_name)) {
   pkg_name
 } else {
-  pkg_url <- read.dcf("DESCRIPTION")[1, "URL"]
-  pkg_url_v <- strsplit(pkg_url, ",")[[1]]
-  pkg_url_v <- gsub("\n|/$", "", pkg_url_v)
-  pkg_url_gh <- grep("github.com", pkg_url_v, value = TRUE)
+  # try to get the package reference from the DESCRIPTION file (URL field)
+  pkg_url <- gsub("\n|/$", "", strsplit(read.dcf("DESCRIPTION")[1, "URL"], ",")[[1]])
+  pkg_url_gh <- grep("github.com", pkg_url, value = TRUE)
   res <- paste0(gsub(".*github.com/", "", pkg_url_gh), "@*release")
   if (length(res) == 0) {
     cli::cli_abort("Unable to automatically determine the package reference.")
@@ -131,8 +138,6 @@ pkg_ref_released <- if (pkg_name %in% rownames(available.packages())) {
   res
 }
 install_and_add_to_minicran(pkg_ref_released, minicran_path)
-cli::cli_progress_step("Installing the package (DEV)...")
-install_and_add_to_minicran(".", minicran_path)
 
 cli::cli_progress_done()
 
