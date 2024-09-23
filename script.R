@@ -26,26 +26,36 @@ check_if_pkg_available <- function(pkg, ver = NULL) {
     ) > 0
   }
 }
-install_and_add_to_minicran <- function(pkg, minicran_path) {
-  cli::cli_inform(sprintf("Installing and adding %s to miniCRAN...", pkg))
-  x <- pak::pkg_install(pkg)
+add_to_minicran <- function(x, minicran_path) {
+  temp_dir <- tempfile()
+  on.exit(unlink(temp_dir))
+  dir.create(temp_dir)
+  new_file_name <- gsub("(.*?_.*)_.*?(\\..*)", "\\1\\2", basename(x))
+  file.copy(x, file.path(temp_dir, new_file_name))
+  miniCRAN::addLocalPackage(gsub("_.*", "", basename(new_file_name)), temp_dir, minicran_path)
+  invisible(NULL)
+}
+add_cache_to_minicran <- function(pkg, version, minicran_path) {
+  i_cache <- pkgcache::pkg_cache_find(package = pkg, version = version, platform = "source")
+  if (nrow(i_cache) == 0) return(invisible(NULL))
+  cli::cli_inform(sprintf("Adding %s to miniCRAN...", pkg))
+  add_to_minicran(i_cache$fullpath[1], minicran_path)
+  invisible(NULL)
+}
+install_and_add_to_minicran <- function(ref, minicran_path) {
+  cli::cli_inform(sprintf("Installing and adding %s to miniCRAN...", ref))
+  x <- pak::pkg_install(ref)
   for (i in seq_len(nrow(x))) {
     i_package <- x$package[i]
     i_version <- x$version[i]
     if (check_if_pkg_available(i_package, i_version)) next
-    i_cache <- pkgcache::pkg_cache_find(package = i_package, version = i_version, platform = "source")
-    if (nrow(i_cache) == 0) next
-    i_targz <- i_cache$fullpath[1]
-    temp_dir <- tempfile()
-    on.exit(unlink(temp_dir))
-    dir.create(temp_dir)
-    file.copy(
-      i_targz,
-      file.path(temp_dir, paste0(i_package, "_", i_version, ".tar.gz"))
-    )
-    miniCRAN::addLocalPackage(i_package, temp_dir, minicran_path)
+    add_cache_to_minicran(i_package, i_version, minicran_path)
   }
   invisible(NULL)
+}
+is_installed_from_gh <- function(package_name) {
+  d <- packageDescription(package_name)
+  (!is.null(d$GithubSHA1)) || identical(d$RemoteType, "github")
 }
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -55,9 +65,9 @@ timeout <- as.integer(args[3])
 
 # Install required packages
 catnl("Installing required packages...")
-install.packages(c(
-  "pak"
-))
+if (!requireNamespace("pak", quietly = TRUE)) {
+  install.packages("pak")
+}
 pak::pkg_install(c(
   "cli",
   "miniCRAN",
@@ -98,14 +108,6 @@ cli::cli_bullets(refs)
 cli::cli_h1("Initiate pre-requisites")
 cli::cli_progress_bar()
 
-## revdepcheck
-cli::cli_progress_step("Initiating `revdepcheck`...")
-revdepcheck::revdep_reset()
-unlink("./revdep/", recursive = TRUE)
-revdepcheck:::db_disconnect(".")
-usethis::use_revdep()
-revdepcheck:::db_setup(".")
-
 ## miniCRAN
 cli::cli_progress_step("Initiating `miniCRAN`...")
 minicran_path <- tempfile()
@@ -119,25 +121,37 @@ options("repos" = c(
   getOption("repos")
 ))
 
-## install pkg
-cli::cli_progress_step("Installing the package (DEV)...")
-install_and_add_to_minicran(".", minicran_path)
-cli::cli_progress_step("Installing the package (CRAN)...")
+### install pkg - only if not available
 pkg_name <- read.dcf("DESCRIPTION")[, "Package"]
-pkg_ref_released <- if (check_if_pkg_available(pkg_name)) {
-  pkg_name
-} else {
+if (isFALSE(check_if_pkg_available(pkg_name))) {
+  cli::cli_progress_step("Adding GH release to miniCRAN...")
   # try to get the package reference from the DESCRIPTION file (URL field)
   pkg_url <- gsub("\n|/$", "", strsplit(read.dcf("DESCRIPTION")[1, "URL"], ",")[[1]])
   pkg_url_gh <- grep("github.com", pkg_url, value = TRUE)
-  res <- paste0(gsub(".*github.com/", "", pkg_url_gh), "@*release")
-  if (length(res) == 0) {
+  pkg_ref_released <- paste0(gsub(".*github.com/", "", pkg_url_gh), "@*release")
+  if (length(pkg_ref_released) == 0) {
     cli::cli_abort("Unable to automatically determine the package reference.")
     return(NULL)
   }
-  res
+  install_and_add_to_minicran(pkg_ref_released, minicran_path)
 }
-install_and_add_to_minicran(pkg_ref_released, minicran_path)
+
+### add pkgs from GH to miniCRAN
+cli::cli_progress_step("Adding packages from GH to miniCRAN...")
+x <- pkgdepends::new_pkg_deps(".")
+x$resolve()
+pkgs_from_gh <- Filter(is_installed_from_gh, unique(x$get_resolution()$package))
+for (pkg in pkgs_from_gh) {
+  add_cache_to_minicran(pkg, installed.packages()[pkg, "Version"], minicran_path)
+}
+
+## revdepcheck
+cli::cli_progress_step("Initiating `revdepcheck`...")
+revdepcheck::revdep_reset()
+unlink("./revdep/", recursive = TRUE)
+revdepcheck:::db_disconnect(".")
+usethis::use_revdep()
+revdepcheck:::db_setup(".")
 
 cli::cli_progress_done()
 
