@@ -72,7 +72,12 @@ catnl("Installing required packages...")
 if (!requireNamespace("pak", quietly = TRUE)) {
   install.packages("pak", quiet = TRUE)
 }
-options(repos = c(RSPM = "PPM@latest", CRAN = "https://cloud.r-project.org"))
+options(
+  repos = c(
+    PPM = pkgcache::repo_resolve("PPM@latest"),
+    getOption("repos")
+  )
+)
 pak::pkg_install(c(
   "cli",
   "miniCRAN",
