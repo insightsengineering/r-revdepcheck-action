@@ -72,6 +72,9 @@ catnl("Installing required packages...")
 if (!requireNamespace("pak", quietly = TRUE)) {
   install.packages("pak", quiet = TRUE)
 }
+if (!requireNamespace("pkgcache", quietly = TRUE)) {
+  install.packages("pkgcache", quiet = TRUE)
+}
 options(
   repos = c(
     PPM = pkgcache::repo_resolve("PPM@latest"),
