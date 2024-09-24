@@ -65,14 +65,14 @@ timeout <- as.integer(args[3])
 
 # debug print - @TODO: remove
 print(.libPaths())
-print(installed.packages()[, c("Package", "LibPath", "Version")])
+print(installed.packages()[1:3, c("Package", "LibPath", "Version")])
 
 # Install required packages
 catnl("Installing required packages...")
-options(repos = c(RSPM = "PPM@latest", CRAN = "https://cloud.r-project.org"))
 if (!requireNamespace("pak", quietly = TRUE)) {
   install.packages("pak", quiet = TRUE)
 }
+options(repos = c(RSPM = "PPM@latest", CRAN = "https://cloud.r-project.org"))
 pak::pkg_install(c(
   "cli",
   "miniCRAN",
