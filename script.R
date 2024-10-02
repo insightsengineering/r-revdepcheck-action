@@ -30,6 +30,7 @@ add_to_minicran <- function(x, minicran_path) {
   temp_dir <- tempfile()
   on.exit(unlink(temp_dir))
   dir.create(temp_dir)
+  # for GH packages we have `pkg_1.2.3.9000_hash.tar.gz` so we need to remove the hash and keep only `pkg_1.2.3.9000.tar.gz`
   new_file_name <- gsub("(.*?_.*)_.*?(\\..*)", "\\1\\2", basename(x))
   file.copy(x, file.path(temp_dir, new_file_name))
   miniCRAN::addLocalPackage(gsub("_.*", "", basename(new_file_name)), temp_dir, minicran_path)
