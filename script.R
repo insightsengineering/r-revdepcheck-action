@@ -12,7 +12,7 @@ if_error <- function(x, y = NULL) {
 }
 check_if_pkg_available <- function(pkg, ver = NULL) {
   if (is.null(ver)) {
-    length(available.packages(filter = list(add = TRUE, function(db) db[db[, "Package"] == pkg, ]))) > 0
+    length(available.packages(filters = list(add = TRUE, function(db) db[db[, "Package"] == pkg, ]))) > 0
   } else {
     length(
       available.packages(
