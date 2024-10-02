@@ -141,7 +141,7 @@ if (isFALSE(check_if_pkg_available(pkg_name))) {
   pkg_url_gh <- grep("github.com", pkg_url, value = TRUE)
   pkg_ref_released <- paste0(gsub(".*github.com/", "", pkg_url_gh), "@*release")
   if (length(pkg_ref_released) == 0) {
-    cli::cli_abort("Unable to automatically determine the package reference.")
+    cli::cli_abort("Unable to automatically determine the package reference for GitHub release.")
     return(NULL)
   }
   install_and_add_to_minicran(pkg_ref_released, minicran_path)
