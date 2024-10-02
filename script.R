@@ -123,6 +123,7 @@ cli::cli_progress_step("Initiating `miniCRAN`...")
 minicran_path <- tempfile()
 dir.create(minicran_path)
 on.exit(unlink(minicran_path, recursive = TRUE))
+# added `rlang` as a dummy package as the `pkgs` arg cannot be empty
 miniCRAN::makeRepo(pkgs = "rlang", path = minicran_path, type = c("source", .Platform$pkgType))
 # add minicran repo path to repos so that revdepcheck can use it
 # this is the directory where we will store packages from config file
