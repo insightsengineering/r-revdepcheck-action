@@ -11,20 +11,20 @@ if_error <- function(x, y = NULL) {
   if (!length(x) || is.null(x)) y else x
 }
 check_if_pkg_available <- function(pkg, ver = NULL) {
-  if (is.null(ver)) {
-    length(available.packages(filters = list(add = TRUE, function(db) db[db[, "Package"] == pkg, ]))) > 0
-  } else {
-    length(
-      available.packages(
-        filters = list(
-          add = TRUE,
-          function(db) {
+  length(
+    available.packages(
+      filters = list(
+        add = TRUE,
+        function(db) {
+          if (is.null(ver)) {
+            db[db[, "Package"] == pkg, ]
+          } else {
             db[db[, "Package"] == pkg & db[, "Version"] == ver, ]
           }
-        )
+        }
       )
-    ) > 0
-  }
+    )
+  ) > 0
 }
 add_to_minicran <- function(x, minicran_path) {
   temp_dir <- tempfile()
