@@ -16,7 +16,7 @@ check_if_pkg_available <- function(pkg, ver = NULL) {
   } else {
     length(
       available.packages(
-        filter = list(
+        filters = list(
           add = TRUE,
           function(db) {
             db[db[, "Package"] == pkg & db[, "Version"] == ver, ]
