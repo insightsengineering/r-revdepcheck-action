@@ -10,6 +10,54 @@ if_error <- function(x, y = NULL) {
 `%||%` <- function(x, y) {
   if (!length(x) || is.null(x)) y else x
 }
+check_if_pkg_available <- function(pkg, ver = NULL) {
+  length(
+    available.packages(
+      filters = list(
+        add = TRUE,
+        function(db) {
+          if (is.null(ver)) {
+            db[db[, "Package"] == pkg, ]
+          } else {
+            db[db[, "Package"] == pkg & db[, "Version"] == ver, ]
+          }
+        }
+      )
+    )
+  ) > 0
+}
+add_to_minicran <- function(x, minicran_path) {
+  temp_dir <- tempfile()
+  on.exit(unlink(temp_dir))
+  dir.create(temp_dir)
+  # for GH packages we have `pkg_1.2.3.9000_hash.tar.gz` so we need to remove the hash and keep only `pkg_1.2.3.9000.tar.gz`
+  new_file_name <- gsub("(.*?_.*)_.*?(\\..*)", "\\1\\2", basename(x))
+  file.copy(x, file.path(temp_dir, new_file_name))
+  miniCRAN::addLocalPackage(gsub("_.*", "", basename(new_file_name)), temp_dir, minicran_path)
+  invisible(NULL)
+}
+add_cache_to_minicran <- function(pkg, version, minicran_path) {
+  i_cache <- pkgcache::pkg_cache_find(package = pkg, version = version, platform = "source")
+  if (nrow(i_cache) == 0) return(invisible(NULL))
+  cli::cli_inform(sprintf("Adding %s to miniCRAN...", pkg))
+  add_to_minicran(i_cache$fullpath[1], minicran_path)
+  invisible(NULL)
+}
+install_and_add_to_minicran <- function(ref, minicran_path) {
+  cli::cli_inform(sprintf("Installing and adding %s to miniCRAN...", ref))
+  x <- pak::pkg_install(ref, ask = FALSE)
+  for (i in seq_len(nrow(x))) {
+    i_package <- x$package[i]
+    i_version <- x$version[i]
+    if (check_if_pkg_available(i_package, i_version)) next
+    add_cache_to_minicran(i_package, i_version, minicran_path)
+  }
+  invisible(NULL)
+}
+is_installed_from_gh <- function(package_name) {
+  d <- packageDescription(package_name)
+  (!is.null(d$GithubSHA1)) || identical(d$RemoteType, "github")
+}
 
 args <- commandArgs(trailingOnly = TRUE)
 setwd(normalizePath(file.path(args[1])))
@@ -18,9 +66,18 @@ timeout <- as.integer(args[3])
 
 # Install required packages
 catnl("Installing required packages...")
-install.packages(c(
-  "pak"
-))
+if (!requireNamespace("pak", quietly = TRUE)) {
+  install.packages("pak", quiet = TRUE)
+}
+if (!requireNamespace("pkgcache", quietly = TRUE)) {
+  install.packages("pkgcache", quiet = TRUE)
+}
+options(
+  repos = c(
+    PPM = pkgcache::repo_resolve("PPM@latest"),
+    getOption("repos")
+  )
+)
 pak::pkg_install(c(
   "cli",
   "miniCRAN",
@@ -61,24 +118,11 @@ cli::cli_bullets(refs)
 cli::cli_h1("Initiate pre-requisites")
 cli::cli_progress_bar()
 
-## install pkg
-# cache pkg and its dependencies
-cli::cli_progress_step("Installing the package...")
-pkg_name <- read.dcf("DESCRIPTION")[1, "Package"][[1]]
-crancache::install_packages(pkg_name, quiet = TRUE)
-
-## revdepcheck
-cli::cli_progress_step("Initiating `revdepcheck`...")
-revdepcheck::revdep_reset()
-unlink("./revdep/", recursive = TRUE)
-revdepcheck:::db_disconnect(".")
-usethis::use_revdep()
-revdepcheck:::db_setup(".")
-
 ## miniCRAN
 cli::cli_progress_step("Initiating `miniCRAN`...")
 minicran_path <- tempfile()
 dir.create(minicran_path)
+on.exit(unlink(minicran_path, recursive = TRUE))
 # added `rlang` as a dummy package as the `pkgs` arg cannot be empty
 miniCRAN::makeRepo(pkgs = "rlang", path = minicran_path, type = c("source", .Platform$pkgType))
 # add minicran repo path to repos so that revdepcheck can use it
@@ -88,61 +132,53 @@ options("repos" = c(
   getOption("repos")
 ))
 
+### install pkg - only if not available
+pkg_name <- read.dcf("DESCRIPTION")[, "Package"]
+if (isFALSE(check_if_pkg_available(pkg_name))) {
+  cli::cli_progress_step("Adding GH release to miniCRAN...")
+  # try to get the package reference from the DESCRIPTION file (URL field)
+  pkg_url <- gsub("\n|/$", "", strsplit(read.dcf("DESCRIPTION")[1, "URL"], ",")[[1]])
+  pkg_url_gh <- grep("github.com", pkg_url, value = TRUE)
+  pkg_ref_released <- paste0(gsub(".*github.com/", "", pkg_url_gh), "@*release")
+  if (length(pkg_ref_released) == 0) {
+    cli::cli_abort("Unable to automatically determine the package reference for GitHub release.")
+    return(NULL)
+  }
+  install_and_add_to_minicran(pkg_ref_released, minicran_path)
+}
+
+### add pkgs from GH to miniCRAN
+cli::cli_progress_step("Adding packages from GH to miniCRAN...")
+x <- pkgdepends::new_pkg_deps(".")
+x$resolve()
+pkgs_from_gh <- Filter(is_installed_from_gh, unique(x$get_resolution()$package))
+for (pkg in pkgs_from_gh) {
+  add_cache_to_minicran(pkg, installed.packages()[pkg, "Version"], minicran_path)
+}
+
+## revdepcheck
+cli::cli_progress_step("Initiating `revdepcheck`...")
+revdepcheck::revdep_reset()
+unlink("./revdep/", recursive = TRUE)
+revdepcheck:::db_disconnect(".")
+usethis::use_revdep()
+revdepcheck:::db_setup(".")
+
 cli::cli_progress_done()
 
 
 cli::cli_h1("Add refs to revdepcheck")
 # include refs in revdepcheck
-## Add revdep to miniCRAN repo so that it can be found by the revdepcheck.
-## miniCRAN accepts only prebuilt .tar.gz file and build requires all the dependencies pre-installed.
-## This is why we need to install all the deps of revdep (incl. tested package).
-## It's important to use `crancache` as much as possible to make use of caching.
-## Algorithm:
-## for ref in refs:
-## - install dependencies using `crancache`
-## - install pkg using `pak` - this also gives prebuilt .tar.gz file
-## - move .tar.gz file to miniCRAN repo
-## - add to revdep todo table
+## Add refs revdepcheck and also to miniCRAN so that it can be found from there
 cli::cli_progress_bar("Adding refs to revdepcheck", total = length(refs))
 for (ref in refs) {
   cli::cli_progress_message("Adding {ref}...")
 
-  ref_parsed <- pkgdepends::parse_pkg_ref(ref)
-  ref_pkg <- ref_parsed$package
+  install_and_add_to_minicran(ref, minicran_path)
 
-  if (!is(ref_parsed, "remote_ref_standard") && !is(ref_parsed, "remote_ref_cran")) {
-    cli::cli_progress_message("Installing dependencies of {ref}...")
-    ref_deps <- pkgdepends::new_pkg_deps(ref, config = list(dependencies = FALSE))
-    ref_deps$resolve()
-    ref_deps_df <- ref_deps$get_resolution()[1, "deps"][[1]]
-    ref_deps_hard <- ref_deps_df[
-      tolower(ref_deps_df$type) %in% tolower(pkgdepends::pkg_dep_types_hard()) & ref_deps_df$ref != "R",
-      "package"
-    ]
-    crancache::install_packages(ref_deps_hard, quiet = TRUE)
-
-    cli::cli_progress_message("Installing {ref}...")
-    ref_install <- pak::pkg_install(ref)
-    ref_cache <- pkgcache::pkg_cache_find(package = ref_pkg)
-    ref_targz <- subset(
-      ref_cache,
-      (built == 1 | built == TRUE | built == "TRUE") & platform == "source" & version == ref_install$version[1],
-      fullpath
-    )[[1]]
-    # cache might have multiple files for a given package and version
-    # copy this file to the temp dir and add to miniCRAN from that dir
-    temp_dir <- tempfile()
-    dir.create(temp_dir)
-    file.copy(
-      ref_targz,
-      file.path(temp_dir, paste0(sub("(.*?_.*?)_.*", "\\1", basename(ref_targz)), ".tar.gz"))
-    )
-    miniCRAN::addLocalPackage(ref_pkg, temp_dir, minicran_path)
-
-    cli::cli_inform("Added {ref} to minicran!")
-  }
-
+  ref_pkg <- pkgdepends::parse_pkg_ref(ref)$package
   revdepcheck::revdep_add(packages = ref_pkg)
+
   cli::cli_inform("Added {ref} to revdep todo!")
   cli::cli_progress_update()
 }
@@ -182,17 +218,21 @@ catnl(readLines("revdep/cran.md", warn = FALSE))
 
 cli::cli_h2("Check duration...")
 # this does not include download and install times
-print(
-  setNames(
-    do.call(
-      rbind.data.frame,
-      lapply(
-        revdepcheck::revdep_summary(),
-        function(i) c(i$package, if_error(i$old[[1]]$duration) %||% "?", if_error(i$new$duration) %||% "?")
-      )
-    ),
-    c("package", "old", "new")
+if (length(revdepcheck::revdep_summary())) {
+  print(
+    setNames(
+      do.call(
+        rbind.data.frame,
+        lapply(
+          revdepcheck::revdep_summary(),
+          function(i) c(i$package, if_error(i$old[[1]]$duration) %||% "?", if_error(i$new$duration) %||% "?")
+        )
+      ),
+      c("package", "old", "new")
+    )
   )
-)
+} else {
+  print("(empty)")
+}
 
 stopifnot(identical(readLines("revdep/problems.md", warn = FALSE), "*Wow, no problems at all. :)*"))
