@@ -45,7 +45,7 @@ add_cache_to_minicran <- function(pkg, version, minicran_path) {
 }
 install_and_add_to_minicran <- function(ref, minicran_path) {
   cli::cli_inform(sprintf("Installing and adding %s to miniCRAN...", ref))
-  x <- pak::pkg_install(ref)
+  x <- pak::pkg_install(ref, ask = FALSE)
   for (i in seq_len(nrow(x))) {
     i_package <- x$package[i]
     i_version <- x$version[i]
