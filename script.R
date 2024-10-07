@@ -1,3 +1,18 @@
+# Introduction:
+# The `revdepcheck` package uses the `crancache::install_packages()` function for package installation. This function, in turn, utilizes `utils::install.packages()` and incorporates an additional caching mechanism for efficiency.
+#
+# Current Limitations:
+# Modifying this behavior would require changes to the source code, which is currently not feasible. There is an existing issue on this topic (https://github.com/r-lib/revdepcheck/issues/187), but it's unlikely to be addressed in the near future.
+#
+# Proposed Solution:
+# The proposed solution is to integrate with the existing workflow by creating a CRAN-like repository. This repository will contain packages from `pak`'s cache, making them accessible via the default `install.packages()` function.
+#
+# Design Overview:
+# 1. Create a CRAN-like repository using the `miniCRAN` package.
+# 2. Install the target package and its reverse dependencies using the `pak` package.
+# 3. If a package is not available on the default CRAN (e.g., it's hosted on GitHub), retrieve the cached binaries and add them to the miniCRAN repository.
+# 4. Run `revdepcheck::revdep_check()` as usual to check reverse dependencies.
+
 catnl <- function(x = "") cat(sprintf("%s\n", x))
 if_error <- function(x, y = NULL) {
   res <- try(x, silent = TRUE)
