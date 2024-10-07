@@ -164,9 +164,9 @@ if (isFALSE(check_if_pkg_available(pkg_name))) {
 
 ### add pkgs from GH to miniCRAN
 cli::cli_progress_step("Adding packages from GH to miniCRAN...")
-x <- pkgdepends::new_pkg_deps(".")
+x <- pkgdepends::new_pkg_deps("deps::.")
 x$resolve()
-pkgs_from_gh <- Filter(is_installed_from_gh, unique(x$get_resolution()$package))
+pkgs_from_gh <- Filter(is_installed_from_gh, Filter(function(x) x %in% rownames(installed.packages()), unique(x$get_resolution()$package)))
 for (pkg in pkgs_from_gh) {
   add_cache_to_minicran(pkg, installed.packages()[pkg, "Version"], minicran_path)
 }
