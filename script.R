@@ -46,46 +46,69 @@ check_if_added <- function(pkg, ver = NULL, minicran_path) {
   }
 }
 get_tar_gz <- function(pkg, version, path) {
+  # Check file extension first and return early if not supported
   if (!grepl(".*.tar.gz$", path) && !grepl(".*.tar.gz-t$", path)) {
     cli::cli_abort("Unknown path type: {path}. Expected .tar.gz or .tar.gz-t file.")
   }
 
+  # Check if file/directory exists
   if (!file.exists(path)) {
     cli::cli_warn("Path {path} does not exist, skipping...")
     return(NULL)
   }
 
-  is_valid_tar_gz <- function(file) {
-    if (grepl(".*.tar.gz-t$", file)) {
-      return(TRUE)
-    }
-    res <- try(untar(file, list = TRUE), silent = TRUE)
-    !inherits(res, "try-error")
-  }
-
   if (grepl(".*.tar.gz$", path) && !grepl(".*.tar.gz-t$", path)) {
-    if (!is_valid_tar_gz(path)) {
+    # Regular .tar.gz file - validate it's a proper tar archive
+    res <- try(untar(path, list = TRUE), silent = TRUE)
+    if (inherits(res, "try-error")) {
       cli::cli_abort("File {path} is not a valid tar archive.")
     }
     return(path)
   } else if (grepl(".*.tar.gz-t$", path)) {
-    tgz_path <- tempfile(fileext = ".tar.gz")
+    # Handle .tar.gz-t files - these are pak's local package cache
+    # Key insight: For local packages, don't untar! The path is already a directory structure
 
     if (file.info(path)$isdir) {
-      pkgbuild::build(file.path(path, pkg), dest_path = tgz_path, binary = FALSE, manual = FALSE, vignettes = FALSE)
-      return(tgz_path)
-    } else {
-      untarred_dir <- tempfile()
-      dir.create(untarred_dir)
-      on.exit(unlink(untarred_dir, recursive = TRUE), add = TRUE)
-
-      if (!is_valid_tar_gz(path)) {
-        cli::cli_abort("File {path} is not a valid tar archive.")
+      # It's a directory - build directly from it
+      pkg_path <- file.path(path, pkg)
+      if (!dir.exists(pkg_path)) {
+        # If pkg subdirectory doesn't exist, use the directory itself
+        pkg_path <- path
       }
-      untar(path, exdir = untarred_dir)
-      sources_dirs <- list.dirs(untarred_dir, full.names = TRUE, recursive = FALSE)
-      pkgbuild::build(sources_dirs[1], dest_path = tgz_path, binary = FALSE, manual = FALSE, vignettes = FALSE)
-      return(tgz_path)
+      temp_dir <- tempfile()
+      dir.create(temp_dir)
+      built_path <- pkgbuild::build(pkg_path, dest_path = temp_dir, binary = FALSE, manual = FALSE, vignettes = FALSE)
+      return(built_path)
+    } else {
+      # It's a file with .tar.gz-t extension
+      # For local packages: DON'T untar, build directly from the path structure
+      pkg_path <- file.path(path, pkg)
+      if (dir.exists(pkg_path)) {
+        # This is a local package - build directly without untarring
+        temp_dir <- tempfile()
+        dir.create(temp_dir)
+        built_path <- pkgbuild::build(pkg_path, dest_path = temp_dir, binary = FALSE, manual = FALSE, vignettes = FALSE)
+        return(built_path)
+      } else {
+        # This might be a GitHub package that needs untarring
+        untarred_dir <- tempfile()
+        untar_result <- try(untar(path, exdir = untarred_dir), silent = TRUE)
+        if (inherits(untar_result, "try-error")) {
+          cli::cli_warn("Failed to extract {path} and no local package directory found, skipping...")
+          return(NULL)
+        }
+
+        sources_dirs <- list.dirs(untarred_dir, full.names = TRUE, recursive = FALSE)
+        if (length(sources_dirs) == 0) {
+          cli::cli_warn("No directories found after extracting {path}, skipping...")
+          return(NULL)
+        }
+
+        temp_dir <- tempfile()
+        dir.create(temp_dir)
+        built_path <- pkgbuild::build(sources_dirs[1], dest_path = temp_dir, binary = FALSE, manual = FALSE, vignettes = FALSE)
+        return(built_path)
+      }
     }
   }
 }
@@ -120,12 +143,23 @@ build_and_add_to_minicran <- function(pkg, version, fulltarget, fulltarget_tree,
 
   tgz_path <- NULL
 
+  cli::cli_inform("Debugging package: {pkg} version {version}")
+  cli::cli_inform("- checking fulltarget: {fulltarget}")
+  cli::cli_inform("- fulltarget exists: {file.exists(fulltarget)}")
+  cli::cli_inform("- checking fulltarget_tree: {fulltarget_tree}")
+  cli::cli_inform("- fulltarget_tree exists: {file.exists(fulltarget_tree)}")
+
   if (file.exists(fulltarget)) {
     tgz_path <- fulltarget
+    cli::cli_inform("- using fulltarget path: {tgz_path}")
   } else if (file.exists(fulltarget_tree)) {
+    cli::cli_inform("- attempting to extract from fulltarget_tree")
     tgz_path <- get_tar_gz(pkg, version, fulltarget_tree)
+    cli::cli_inform("- extracted tgz_path: {tgz_path %||% 'NULL'}")
   } else {
+    cli::cli_inform("- attempting to find package in cache")
     tgz_path <- get_tar_gz_from_cache(pkg, version)
+    cli::cli_inform("- cache tgz_path: {tgz_path %||% 'NULL'}")
   }
 
   if (is.null(tgz_path)) {
