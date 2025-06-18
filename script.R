@@ -37,7 +37,9 @@ check_if_pkg_available <- function(pkg, ver = NULL) {
   }
 }
 check_if_added <- function(pkg, ver = NULL, minicran_path) {
-  minicran_ap <- as.data.frame(available.packages(repos = paste0("file:///", minicran_path)))
+  minicran_ap <- as.data.frame(available.packages(
+    repos = paste0("file:///", minicran_path)
+  ))
   if (nrow(minicran_ap) == 0) return(FALSE)
   if (is.null(ver)) {
     nrow(subset(minicran_ap, Package == pkg)) > 0
@@ -48,7 +50,9 @@ check_if_added <- function(pkg, ver = NULL, minicran_path) {
 get_tar_gz <- function(pkg, version, path) {
   # Check file extension first and return early if not supported
   if (!grepl(".*.tar.gz$", path) && !grepl(".*.tar.gz-t$", path)) {
-    cli::cli_abort("Unknown path type: {path}. Expected .tar.gz or .tar.gz-t file.")
+    cli::cli_abort(
+      "Unknown path type: {path}. Expected .tar.gz or .tar.gz-t file."
+    )
   }
 
   # Check if file/directory exists
@@ -77,7 +81,13 @@ get_tar_gz <- function(pkg, version, path) {
       }
       temp_dir <- tempfile()
       dir.create(temp_dir)
-      built_path <- pkgbuild::build(pkg_path, dest_path = temp_dir, binary = FALSE, manual = FALSE, vignettes = FALSE)
+      built_path <- pkgbuild::build(
+        pkg_path,
+        dest_path = temp_dir,
+        binary = FALSE,
+        manual = FALSE,
+        vignettes = FALSE
+      )
       return(built_path)
     } else {
       # It's a file with .tar.gz-t extension
@@ -87,33 +97,57 @@ get_tar_gz <- function(pkg, version, path) {
         # This is a local package - build directly without untarring
         temp_dir <- tempfile()
         dir.create(temp_dir)
-        built_path <- pkgbuild::build(pkg_path, dest_path = temp_dir, binary = FALSE, manual = FALSE, vignettes = FALSE)
+        built_path <- pkgbuild::build(
+          pkg_path,
+          dest_path = temp_dir,
+          binary = FALSE,
+          manual = FALSE,
+          vignettes = FALSE
+        )
         return(built_path)
       } else {
         # This might be a GitHub package that needs untarring
         untarred_dir <- tempfile()
         untar_result <- try(untar(path, exdir = untarred_dir), silent = TRUE)
         if (inherits(untar_result, "try-error")) {
-          cli::cli_warn("Failed to extract {path} and no local package directory found, skipping...")
+          cli::cli_warn(
+            "Failed to extract {path} and no local package directory found, skipping..."
+          )
           return(NULL)
         }
 
-        sources_dirs <- list.dirs(untarred_dir, full.names = TRUE, recursive = FALSE)
+        sources_dirs <- list.dirs(
+          untarred_dir,
+          full.names = TRUE,
+          recursive = FALSE
+        )
         if (length(sources_dirs) == 0) {
-          cli::cli_warn("No directories found after extracting {path}, skipping...")
+          cli::cli_warn(
+            "No directories found after extracting {path}, skipping..."
+          )
           return(NULL)
         }
 
         temp_dir <- tempfile()
         dir.create(temp_dir)
-        built_path <- pkgbuild::build(sources_dirs[1], dest_path = temp_dir, binary = FALSE, manual = FALSE, vignettes = FALSE)
+        built_path <- pkgbuild::build(
+          sources_dirs[1],
+          dest_path = temp_dir,
+          binary = FALSE,
+          manual = FALSE,
+          vignettes = FALSE
+        )
         return(built_path)
       }
     }
   }
 }
 get_tar_gz_from_cache <- function(pkg, version) {
-  i_cache <- pkgcache::pkg_cache_find(package = pkg, version = version, platform = "source") %df_empty%
+  i_cache <- pkgcache::pkg_cache_find(
+    package = pkg,
+    version = version,
+    platform = "source"
+  ) %df_empty%
     pkgcache::pkg_cache_find(package = pkg, version = version)
 
   if (nrow(i_cache) == 0) return(NULL)
@@ -138,8 +172,18 @@ add_to_minicran <- function(pkg, version, tar_gz_path, minicran_path) {
 
   invisible(NULL)
 }
-build_and_add_to_minicran <- function(pkg, version, fulltarget, fulltarget_tree, minicran_path) {
-  cli::cli_inform(sprintf("Building and adding %s version %s to miniCRAN...", pkg, version))
+build_and_add_to_minicran <- function(
+  pkg,
+  version,
+  fulltarget,
+  fulltarget_tree,
+  minicran_path
+) {
+  cli::cli_inform(sprintf(
+    "Building and adding %s version %s to miniCRAN...",
+    pkg,
+    version
+  ))
 
   tgz_path <- NULL
 
@@ -163,7 +207,9 @@ build_and_add_to_minicran <- function(pkg, version, fulltarget, fulltarget_tree,
   }
 
   if (is.null(tgz_path)) {
-    cli::cli_warn("Failed to get tar.gz file for {pkg} version {version}, skipping...")
+    cli::cli_warn(
+      "Failed to get tar.gz file for {pkg} version {version}, skipping..."
+    )
     return(invisible(NULL))
   }
 
@@ -233,15 +279,18 @@ if (!requireNamespace("pak", quietly = TRUE)) {
 if (!requireNamespace("pkgcache", quietly = TRUE)) {
   install.packages("pkgcache", quiet = TRUE)
 }
-pak::pkg_install(c(
-  "cli",
-  "miniCRAN",
-  "pkgbuild",
-  "pkgdepends",
-  "r-lib/revdepcheck",
-  "usethis",
-  "yaml"
-), ask = FALSE)
+pak::pkg_install(
+  c(
+    "cli",
+    "miniCRAN",
+    "pkgbuild",
+    "pkgdepends",
+    "r-lib/revdepcheck",
+    "usethis",
+    "yaml"
+  ),
+  ask = FALSE
+)
 options(
   repos = c(
     PPM = pkgcache::repo_resolve("PPM@latest"),
@@ -285,13 +334,20 @@ minicran_path <- tempfile()
 dir.create(minicran_path)
 on.exit(unlink(minicran_path, recursive = TRUE), add = TRUE)
 # added `rlang` as a dummy package as the `pkgs` arg cannot be empty
-miniCRAN::makeRepo(pkgs = "rlang", path = minicran_path, type = c("source", .Platform$pkgType), quiet = TRUE)
+miniCRAN::makeRepo(
+  pkgs = "rlang",
+  path = minicran_path,
+  type = c("source", .Platform$pkgType),
+  quiet = TRUE
+)
 # add minicran repo path to repos so that revdepcheck can use it
 # this is the directory where we will store packages from config file
-options("repos" = c(
-  "minicran" = paste0("file:///", minicran_path),
-  getOption("repos")
-))
+options(
+  "repos" = c(
+    "minicran" = paste0("file:///", minicran_path),
+    getOption("repos")
+  )
+)
 #Sys.setenv(CRANCACHE_REPOS = "minicran, cran, bioc")
 
 ## installing the package
@@ -302,11 +358,17 @@ if (check_if_pkg_available(pkg_name)) {
   pkg_ref_released <- pkg_name
 } else {
   # try to get the package reference from the DESCRIPTION file (URL field)
-  pkg_url <- gsub("\n|/$", "", strsplit(read.dcf("DESCRIPTION")[1, "URL"], ",")[[1]])
+  pkg_url <- gsub(
+    "\n|/$",
+    "",
+    strsplit(read.dcf("DESCRIPTION")[1, "URL"], ",")[[1]]
+  )
   pkg_url_gh <- grep("github.com", pkg_url, value = TRUE)
   pkg_ref_released <- paste0(gsub(".*github.com/", "", pkg_url_gh), "@*release")
   if (length(pkg_ref_released) == 0) {
-    cli::cli_abort("Unable to automatically determine the package reference for GitHub release.")
+    cli::cli_abort(
+      "Unable to automatically determine the package reference for GitHub release."
+    )
     return(NULL)
   }
 }
@@ -335,23 +397,32 @@ cli::cli_progress_bar("Adding refs to revdepcheck", total = length(refs))
 for (ref in refs) {
   cli::cli_progress_message("Adding {ref}...")
 
-  tryCatch({
-    download_and_add_to_minicran(ref, minicran_path)
+  tryCatch(
+    {
+      install_and_add_to_minicran(ref, minicran_path)
 
-    ref_pkg <- pkgdepends::parse_pkg_ref(ref)$package
-    revdepcheck::revdep_add(packages = ref_pkg)
+      ref_pkg <- pkgdepends::parse_pkg_ref(ref)$package
+      revdepcheck::revdep_add(packages = ref_pkg)
 
-    cli::cli_inform("Added {ref} to revdep todo!")
-  }, error = function(e) {
-    cli::cli_warn(sprintf("Failed to download and add %s to miniCRAN: %s", ref, e$message))
-  })
+      cli::cli_inform("Added {ref} to revdep todo!")
+    },
+    error = function(e) {
+      cli::cli_warn(sprintf(
+        "Failed to download and add %s to miniCRAN: %s",
+        ref,
+        e$message
+      ))
+    }
+  )
 
   cli::cli_progress_update()
 }
 cli::cli_progress_done()
 cli::cli_inform("All references added!")
 
-cli::cli_inform("The current revdep todo (empty indicates the default - all revdeps):")
+cli::cli_inform(
+  "The current revdep todo (empty indicates the default - all revdeps):"
+)
 print(revdepcheck::revdep_todo())
 
 
@@ -361,7 +432,11 @@ miniCRAN::pkgAvail(repos = minicran_path)[, c("Package", "Version")]
 
 # Execute
 cli::cli_h1("Execute revdepcheck")
-revdepcheck::revdep_check(num_workers = number_of_workers, timeout = timeout, quiet = FALSE)
+revdepcheck::revdep_check(
+  num_workers = number_of_workers,
+  timeout = timeout,
+  quiet = FALSE
+)
 
 
 # Print results
@@ -395,7 +470,12 @@ if (length(revdepcheck::revdep_summary())) {
         rbind.data.frame,
         lapply(
           revdepcheck::revdep_summary(),
-          function(i) c(i$package, if_error(i$old[[1]]$duration) %||% "?", if_error(i$new$duration) %||% "?")
+          function(i)
+            c(
+              i$package,
+              if_error(i$old[[1]]$duration) %||% "?",
+              if_error(i$new$duration) %||% "?"
+            )
         )
       ),
       c("package", "old", "new")
@@ -405,6 +485,11 @@ if (length(revdepcheck::revdep_summary())) {
   print("(empty)")
 }
 
-if (!identical(readLines("revdep/problems.md", warn = FALSE), "*Wow, no problems at all. :)*")) {
+if (
+  !identical(
+    readLines("revdep/problems.md", warn = FALSE),
+    "*Wow, no problems at all. :)*"
+  )
+) {
   stop("There are errors. Please refer to the logs above.")
 }
