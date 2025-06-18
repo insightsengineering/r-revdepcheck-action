@@ -46,35 +46,47 @@ check_if_added <- function(pkg, ver = NULL, minicran_path) {
   }
 }
 get_tar_gz <- function(pkg, version, path) {
+  if (!grepl(".*.tar.gz$", path) && !grepl(".*.tar.gz-t$", path)) {
+    cli::cli_abort("Unknown path type: {path}. Expected .tar.gz or .tar.gz-t file.")
+  }
+
+  if (!file.exists(path)) {
+    cli::cli_warn("Path {path} does not exist, skipping...")
+    return(NULL)
+  }
+
   is_valid_tar_gz <- function(file) {
+    if (grepl(".*.tar.gz-t$", file)) {
+      return(TRUE)
+    }
     res <- try(untar(file, list = TRUE), silent = TRUE)
     !inherits(res, "try-error")
   }
-  if (grepl(".*.tar.gz$", path)) {
-    # Check if the file is a valid tar archive
+
+  if (grepl(".*.tar.gz$", path) && !grepl(".*.tar.gz-t$", path)) {
     if (!is_valid_tar_gz(path)) {
       cli::cli_abort("File {path} is not a valid tar archive.")
     }
-    path
+    return(path)
   } else if (grepl(".*.tar.gz-t$", path)) {
     tgz_path <- tempfile(fileext = ".tar.gz")
+
     if (file.info(path)$isdir) {
-      pkgbuild::build(file.path(path, pkg), binary = FALSE, manual = FALSE, vignettes = FALSE, dest_path = tgz_path)
+      pkgbuild::build(file.path(path, pkg), dest_path = tgz_path, binary = FALSE, manual = FALSE, vignettes = FALSE)
+      return(tgz_path)
     } else {
       untarred_dir <- tempfile()
       dir.create(untarred_dir)
       on.exit(unlink(untarred_dir, recursive = TRUE), add = TRUE)
-      # Check if the file is a valid tar archive before untarring
+
       if (!is_valid_tar_gz(path)) {
         cli::cli_abort("File {path} is not a valid tar archive.")
       }
       untar(path, exdir = untarred_dir)
-      sources_dir <- list.dirs(untarred_dir, full.names = TRUE, recursive = FALSE)
-      pkgbuild::build(sources_dir, binary = FALSE, manual = FALSE, vignettes = FALSE, dest_path = tgz_path)
-      tgz_path
+      sources_dirs <- list.dirs(untarred_dir, full.names = TRUE, recursive = FALSE)
+      pkgbuild::build(sources_dirs[1], dest_path = tgz_path, binary = FALSE, manual = FALSE, vignettes = FALSE)
+      return(tgz_path)
     }
-  } else {
-    cli::cli_abort("Unknown path type: {path}. Expected .tar.gz or .tar.gz-t file.")
   }
 }
 get_tar_gz_from_cache <- function(pkg, version) {
@@ -106,15 +118,19 @@ add_to_minicran <- function(pkg, version, tar_gz_path, minicran_path) {
 build_and_add_to_minicran <- function(pkg, version, fulltarget, fulltarget_tree, minicran_path) {
   cli::cli_inform(sprintf("Building and adding %s version %s to miniCRAN...", pkg, version))
 
+  tgz_path <- NULL
+
   if (file.exists(fulltarget)) {
     tgz_path <- fulltarget
   } else if (file.exists(fulltarget_tree)) {
     tgz_path <- get_tar_gz(pkg, version, fulltarget_tree)
   } else {
     tgz_path <- get_tar_gz_from_cache(pkg, version)
-    if (is.null(tgz_path)) {
-      return(invisible(NULL))
-    }
+  }
+
+  if (is.null(tgz_path)) {
+    cli::cli_warn("Failed to get tar.gz file for {pkg} version {version}, skipping...")
+    return(invisible(NULL))
   }
 
   add_to_minicran(pkg, version, tgz_path, minicran_path)
