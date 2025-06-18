@@ -46,7 +46,15 @@ check_if_added <- function(pkg, ver = NULL, minicran_path) {
   }
 }
 get_tar_gz <- function(pkg, version, path) {
+  is_valid_tar_gz <- function(file) {
+    res <- try(untar(file, list = TRUE), silent = TRUE)
+    !inherits(res, "try-error")
+  }
   if (grepl(".*.tar.gz$", path)) {
+    # Check if the file is a valid tar archive
+    if (!is_valid_tar_gz(path)) {
+      cli::cli_abort("File {path} is not a valid tar archive.")
+    }
     path
   } else if (grepl(".*.tar.gz-t$", path)) {
     tgz_path <- tempfile(fileext = ".tar.gz")
@@ -56,6 +64,10 @@ get_tar_gz <- function(pkg, version, path) {
       untarred_dir <- tempfile()
       dir.create(untarred_dir)
       on.exit(unlink(untarred_dir, recursive = TRUE), add = TRUE)
+      # Check if the file is a valid tar archive before untarring
+      if (!is_valid_tar_gz(path)) {
+        cli::cli_abort("File {path} is not a valid tar archive.")
+      }
       untar(path, exdir = untarred_dir)
       sources_dir <- list.dirs(untarred_dir, full.names = TRUE, recursive = FALSE)
       pkgbuild::build(sources_dir, binary = FALSE, manual = FALSE, vignettes = FALSE, dest_path = tgz_path)
