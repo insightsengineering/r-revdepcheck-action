@@ -40,7 +40,9 @@ check_if_added <- function(pkg, ver = NULL, minicran_path) {
   minicran_ap <- as.data.frame(available.packages(
     repos = paste0("file:///", minicran_path)
   ))
-  if (nrow(minicran_ap) == 0) return(FALSE)
+  if (nrow(minicran_ap) == 0) {
+    return(FALSE)
+  }
   if (is.null(ver)) {
     nrow(subset(minicran_ap, Package == pkg)) > 0
   } else {
@@ -48,6 +50,8 @@ check_if_added <- function(pkg, ver = NULL, minicran_path) {
   }
 }
 get_tar_gz <- function(pkg, version, path) {
+  cli::cli_inform("DEBUG: get_tar_gz called for {pkg} version {version} with path {path}")
+
   # Check file extension first and return early if not supported
   if (!grepl(".*.tar.gz$", path) && !grepl(".*.tar.gz-t$", path)) {
     cli::cli_abort(
@@ -63,6 +67,7 @@ get_tar_gz <- function(pkg, version, path) {
 
   if (grepl(".*.tar.gz$", path) && !grepl(".*.tar.gz-t$", path)) {
     # Regular .tar.gz file - validate it's a proper tar archive
+    cli::cli_inform("DEBUG: Processing regular .tar.gz file: {path}")
     res <- try(untar(path, list = TRUE), silent = TRUE)
     if (inherits(res, "try-error")) {
       cli::cli_abort("File {path} is not a valid tar archive.")
@@ -70,14 +75,19 @@ get_tar_gz <- function(pkg, version, path) {
     return(path)
   } else if (grepl(".*.tar.gz-t$", path)) {
     # Handle .tar.gz-t files - these are pak's local package cache
-    # Key insight: For local packages, don't untar! The path is already a directory structure
+    cli::cli_inform("DEBUG: Processing .tar.gz-t file/directory: {path}")
 
+    # Key insight: For local packages, don't untar! The path is already a directory structure
     if (file.info(path)$isdir) {
       # It's a directory - build directly from it
+      cli::cli_inform("DEBUG: Path is a directory, building package from it")
       pkg_path <- file.path(path, pkg)
       if (!dir.exists(pkg_path)) {
         # If pkg subdirectory doesn't exist, use the directory itself
+        cli::cli_inform("DEBUG: Subdirectory {pkg_path} not found, using {path} directly")
         pkg_path <- path
+      } else {
+        cli::cli_inform("DEBUG: Using subdirectory {pkg_path}")
       }
       temp_dir <- tempfile()
       dir.create(temp_dir)
@@ -91,10 +101,12 @@ get_tar_gz <- function(pkg, version, path) {
       return(built_path)
     } else {
       # It's a file with .tar.gz-t extension
+      cli::cli_inform("DEBUG: Path is a file with .tar.gz-t extension")
       # For local packages: DON'T untar, build directly from the path structure
       pkg_path <- file.path(path, pkg)
       if (dir.exists(pkg_path)) {
         # This is a local package - build directly without untarring
+        cli::cli_inform("DEBUG: Local package directory found at {pkg_path}")
         temp_dir <- tempfile()
         dir.create(temp_dir)
         built_path <- pkgbuild::build(
@@ -107,12 +119,26 @@ get_tar_gz <- function(pkg, version, path) {
         return(built_path)
       } else {
         # This might be a GitHub package that needs untarring
+        cli::cli_inform("DEBUG: No local package directory found, attempting to untar")
+
+        # Debug print of untar list before extraction
+        cli::cli_inform("DEBUG: Listing contents of tar file before extraction")
+        tar_contents <- try(untar(path, list = TRUE), silent = TRUE)
+        if (inherits(tar_contents, "try-error")) {
+          cli::cli_warn("DEBUG: Failed to list contents: {attr(tar_contents, 'condition')$message}")
+        } else {
+          cli::cli_inform("DEBUG: Tar contents (first 10 entries):")
+          cli::cli_inform(paste(utils::head(tar_contents, 10), collapse = "\n"))
+        }
+
         untarred_dir <- tempfile()
+        cli::cli_inform("DEBUG: Untarring to {untarred_dir}")
         untar_result <- try(untar(path, exdir = untarred_dir), silent = TRUE)
         if (inherits(untar_result, "try-error")) {
           cli::cli_warn(
             "Failed to extract {path} and no local package directory found, skipping..."
           )
+          cli::cli_inform("DEBUG: Untar error: {attr(untar_result, 'condition')$message}")
           return(NULL)
         }
 
@@ -121,6 +147,11 @@ get_tar_gz <- function(pkg, version, path) {
           full.names = TRUE,
           recursive = FALSE
         )
+        cli::cli_inform("DEBUG: Found {length(sources_dirs)} source directories after extraction")
+        if (length(sources_dirs) > 0) {
+          cli::cli_inform("DEBUG: Directories: {paste(sources_dirs, collapse=', ')}")
+        }
+
         if (length(sources_dirs) == 0) {
           cli::cli_warn(
             "No directories found after extracting {path}, skipping..."
@@ -130,6 +161,7 @@ get_tar_gz <- function(pkg, version, path) {
 
         temp_dir <- tempfile()
         dir.create(temp_dir)
+        cli::cli_inform("DEBUG: Building package from {sources_dirs[1]}")
         built_path <- pkgbuild::build(
           sources_dirs[1],
           dest_path = temp_dir,
@@ -150,7 +182,9 @@ get_tar_gz_from_cache <- function(pkg, version) {
   ) %df_empty%
     pkgcache::pkg_cache_find(package = pkg, version = version)
 
-  if (nrow(i_cache) == 0) return(NULL)
+  if (nrow(i_cache) == 0) {
+    return(NULL)
+  }
 
   get_tar_gz(pkg, version, i_cache$fullpath[[1]])
 }
@@ -470,12 +504,13 @@ if (length(revdepcheck::revdep_summary())) {
         rbind.data.frame,
         lapply(
           revdepcheck::revdep_summary(),
-          function(i)
+          function(i) {
             c(
               i$package,
               if_error(i$old[[1]]$duration) %||% "?",
               if_error(i$new$duration) %||% "?"
             )
+          }
         )
       ),
       c("package", "old", "new")
