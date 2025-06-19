@@ -359,7 +359,7 @@ for (ref in refs) {
 
   tryCatch(
     {
-      install_and_add_to_minicran(ref, minicran_path)
+      download_and_add_to_minicran(ref, minicran_path)
 
       ref_pkg <- pkgdepends::parse_pkg_ref(ref)$package
       revdepcheck::revdep_add(packages = ref_pkg)
