@@ -28,9 +28,9 @@ if_error <- function(x, y = NULL) {
 available_packages <- as.data.frame(available.packages())
 check_if_pkg_available <- function(pkg, ver = NULL) {
   if (is.null(ver)) {
-    nrow(subset(available_packages, Package == pkg)) > 0
+    nrow(subset(available_packages, Package == pkg)) > 0 # nolint object_usage_linter.
   } else {
-    nrow(subset(available_packages, Package == pkg & Version >= ver)) > 0
+    nrow(subset(available_packages, Package == pkg & Version >= ver)) > 0 # nolint object_usage_linter.
   }
 }
 check_if_added <- function(pkg, ver = NULL, minicran_path) {
@@ -41,9 +41,9 @@ check_if_added <- function(pkg, ver = NULL, minicran_path) {
     return(FALSE)
   }
   if (is.null(ver)) {
-    nrow(subset(minicran_ap, Package == pkg)) > 0
+    nrow(subset(minicran_ap, Package == pkg)) > 0 # nolint object_usage_linter.
   } else {
-    nrow(subset(minicran_ap, Package == pkg & Version == ver)) > 0
+    nrow(subset(minicran_ap, Package == pkg & Version == ver)) > 0 # nolint object_usage_linter.
   }
 }
 add_to_minicran <- function(pkg, version, tar_gz_path, minicran_path) {
