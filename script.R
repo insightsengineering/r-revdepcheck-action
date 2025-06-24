@@ -103,7 +103,7 @@ get_tar_gz_from_fulltarget_tree <- function(pkg, version, path) {
     )
   } else {
     untarred_dir <- tempfile()
-    untar(path, exdir = untarred_dir)
+    untar(normalizePath(path), exdir = untarred_dir)
     sources_dirs <- list.dirs(
       untarred_dir,
       full.names = TRUE,
@@ -156,10 +156,7 @@ download_and_add_to_minicran <- function(ref, minicran_path) {
         x[i, "fulltarget"]
       )
     } else if (file.exists(x[i, "fulltarget_tree"])) {
-      cli::cli_inform(sprintf(
-        "Using fulltarget_tree path: %s",
-        x[i, "fulltarget_tree"]
-      ))
+      cli::cli_inform(sprintf("Using fulltarget_tree path: %s", x[i, "fulltarget_tree"]))
       tar_gz_path <- get_tar_gz_from_fulltarget_tree(
         x[i, "package"],
         x[i, "version"],
