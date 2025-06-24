@@ -103,7 +103,8 @@ get_tar_gz_from_fulltarget_tree <- function(pkg, version, path) {
     )
   } else {
     untarred_dir <- tempfile()
-    untar(normalizePath(path), exdir = untarred_dir)
+    px <- pkgdepends:::make_uncompress_process(path, untarred_dir)
+    px$wait()
     sources_dirs <- list.dirs(
       untarred_dir,
       full.names = TRUE,
