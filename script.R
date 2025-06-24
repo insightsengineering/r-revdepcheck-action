@@ -69,19 +69,13 @@ get_tar_gz_from_installed <- function(pkg) {
   dir.create(tempdir)
   withr::with_dir(tempdir, normalizePath(pkgdepends::pkg_build(pkg)))
 }
-get_tar_gz_from_cache <- function(pkg, version) {
+get_tar_gz_from_cache <- function(pkg, file) {
   i_cache <- pkgcache::pkg_cache_find(
-    package = pkg,
-    version = version,
-    platform = "source"
-  )
-
-  if (nrow(i_cache) == 0) {
-    i_cache <- pkgcache::pkg_cache_find(
-      package = pkg,
-      version = version
+    package = pkg
+  ) |>
+    subset(
+      basename(path) == file
     )
-  }
 
   if (nrow(i_cache) == 0) {
     return(NULL)
@@ -147,7 +141,7 @@ download_and_add_to_minicran <- function(ref, minicran_path) {
       x[i, "version"]
     ))
 
-    if (file.exists(x[i, "file"])) {
+    if (!is.null(x[i, "file"]) && file.exists(x[i, "file"])) {
       cli::cli_inform(sprintf("Using file path: %s", x[i, "file"]))
       tar_gz_path <- get_tar_gz_from_file(
         x[i, "package"],
@@ -175,7 +169,7 @@ download_and_add_to_minicran <- function(ref, minicran_path) {
       cli::cli_inform("No file paths found, attempting to get from cache")
       tar_gz_path <- get_tar_gz_from_cache(
         x[i, "package"],
-        x[i, "version"]
+        basename(x[i, "fulltarget_tree"])
       )
     }
 
