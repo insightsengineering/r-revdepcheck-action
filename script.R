@@ -103,6 +103,9 @@ get_tar_gz_from_fulltarget_tree <- function(pkg, version, path) {
     )
   } else {
     untarred_dir <- tempfile()
+    # this is a private function that handle different compression mechanism
+    # local runs use `tar` but `zip` on remote
+    # this function nicely handles both
     px <- pkgdepends:::make_uncompress_process(path, untarred_dir)
     px$wait()
     sources_dirs <- list.dirs(
@@ -445,4 +448,10 @@ if (
   )
 ) {
   stop("There are errors. Please refer to the logs above.")
+}
+
+if (
+  !all(vapply(revdepcheck::revdep_summary(), `[[`, character(1), "status") == "+")
+) {
+  stop("There are failures. Please refer to the logs above.")
 }
