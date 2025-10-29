@@ -14,6 +14,8 @@
 # 4. Run `revdepcheck::revdep_check()` as usual to check reverse dependencies.
 
 catnl <- function(x = "") cat(sprintf("%s\n", x))
+quiet <- !identical(Sys.getenv("RUNNER_DEBUG", "0"), "1") # Detect workflow debug mode
+
 if_error <- function(x, y = NULL) {
   res <- try(x, silent = TRUE)
   if (is(res, "try-error")) {
@@ -48,7 +50,7 @@ add_to_minicran <- function(x, minicran_path) {
   # for GH packages we have `pkg_1.2.3.9000_hash.tar.gz` so we need to remove the hash and keep only `pkg_1.2.3.9000.tar.gz`
   new_file_name <- gsub("(.*?_.*)_.*?(\\..*)", "\\1\\2", basename(x))
   file.copy(x, file.path(temp_dir, new_file_name))
-  miniCRAN::addLocalPackage(gsub("_.*", "", basename(new_file_name)), temp_dir, minicran_path)
+  miniCRAN::addLocalPackage(gsub("_.*", "", basename(new_file_name)), temp_dir, minicran_path, quiet = quiet)
   invisible(NULL)
 }
 add_cache_to_minicran <- function(pkg, version, minicran_path) {
@@ -81,11 +83,11 @@ timeout <- as.integer(args[3])
 
 # Install required packages
 catnl("Installing required packages...")
-if (!requireNamespace("pak", quietly = TRUE)) {
-  install.packages("pak", quiet = TRUE)
+if (!requireNamespace("pak", quietly = quiet)) {
+  install.packages("pak", quiet = quiet)
 }
-if (!requireNamespace("pkgcache", quietly = TRUE)) {
-  install.packages("pkgcache", quiet = TRUE)
+if (!requireNamespace("pkgcache", quietly = quiet)) {
+  install.packages("pkgcache", quiet = quiet)
 }
 options(
   repos = c(
@@ -206,7 +208,7 @@ print(revdepcheck::revdep_todo())
 
 # Execute
 cli::cli_h1("Execute revdepcheck")
-revdepcheck::revdep_check(num_workers = number_of_workers, timeout = timeout)
+revdepcheck::revdep_check(num_workers = number_of_workers, timeout = timeout, quiet = quiet)
 
 
 # Print results
