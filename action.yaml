@@ -19,7 +19,7 @@ inputs:
   timeout:
     description: Max timeout (in seconds) of revdepcheck process.
     required: false
-    default: "1200"
+    default: "7200"
   additional-env-vars:
     description: |
       Additional environment variables.
